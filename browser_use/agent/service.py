@@ -423,10 +423,10 @@ class Agent:
 	@time_execution_async('--get_next_action')
 	async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
 		"""Get next action from LLM based on current state"""
-		converted_input_messages = self._convert_input_messages(input_messages, self.model_name)
+		input_messages = self._convert_input_messages(input_messages, self.model_name)
 
 		if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1'):
-			output = self.llm.invoke(converted_input_messages)
+			output = self.llm.invoke(input_messages)
 			output.content = self._remove_think_tags(output.content)
 			# TODO: currently invoke does not return reasoning_content, we should override invoke
 			try:
@@ -440,9 +440,21 @@ class Agent:
 			response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
 			parsed: AgentOutput | None = response['parsed']
 		else:
-			structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True, method=self.tool_calling_method)
-			response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
-			parsed: AgentOutput | None = response['parsed']
+			print("A")
+			response_text = await self.llm.ainvoke(input_messages)
+			print("B")
+			response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
+			response_text = self._remove_think_tags(response_text)
+			response_text = json.loads(response_text)
+			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
+				response_text = response_text["parameters"]
+			#extract_page = {"extract_content": {"goal": f"Extract all visible text and structure related to the goal:{response_text["current_state"]["next_goal"]}"}}
+			#response_text["action"].append(extract_page)
+			response_text = json.dumps(response_text)
+
+			parsed_json = self.message_manager.extract_json_from_model_output(response_text)
+			print(f'parsed json: {parsed_json}')
+			parsed = self.AgentOutput(**parsed_json)
 
 		if parsed is None:
 			raise ValueError('Could not parse response.')

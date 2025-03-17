@@ -6,7 +6,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from browser_use.agent.views import ActionResult, AgentStepInfo
 from browser_use.browser.views import BrowserState
-
+import os
+from time import sleep
+from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
+import httpx
+from langchain_core.language_models.chat_models import BaseChatModel
+import asyncio
 
 class SystemPrompt:
 	def __init__(self, action_description: str, max_actions_per_step: int = 10):
@@ -97,7 +103,11 @@ class SystemPrompt:
 
 10. Extraction:
 - If your task is to find information or do research - call extract_page_content on the specific pages to get and store the information.
+11. Assert:
+- If your task is to assert information, call assert_content on the specific pages to assert if the information is present on the page.
 
+12. Fail:
+- If your task failed more than once, try call extract_content on the specific page to help you out
 """
 		text += f'   - use maximum {self.max_actions_per_step} actions per sequence'
 		return text
@@ -220,17 +230,30 @@ Interactive elements from current page:
 					state_description += f'\nAction error {i + 1}/{len(self.result)}: ...{error}'
 
 		if self.state.screenshot and use_vision == True:
-			# Format message for vision model
-			return HumanMessage(
-				content=[
-					{'type': 'text', 'text': state_description},
-					{
-						'type': 'image_url',
-						'image_url': {'url': f'data:image/png;base64,{self.state.screenshot}'},
-					},
-				]
+	# Format message for vision model
+			print("chegou")
+			vdi_api_key: str = os.getenv("VDI_API_KEY") # type: ignore
+			llm= ChatOpenAI(
+				base_url="https://genai-api-dev.dell.com/v1",
+				model="llama-3-2-11b-vision-instruct",
+				api_key=SecretStr(vdi_api_key),
+				http_client=httpx.Client(verify=False),
+				
 			)
-
+			def process_image():	
+				response = llm.invoke([HumanMessage(
+					content=[
+						{'type': 'text', 'text': state_description},
+						{
+							'type': 'image_url',
+							'image_url': {'url': f'data:image/png;base64,{self.state.screenshot}'},
+						},
+					]
+				)])
+				return HumanMessage(content=[{"type": "text", "text": f"Model response: {response.content} and state_description{state_description}"}])
+			print(process_image())
+			sleep(3)
+			return process_image()
 		return HumanMessage(content=state_description)
 
 
