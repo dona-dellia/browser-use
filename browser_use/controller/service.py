@@ -6,6 +6,8 @@ from typing import Callable, Dict, Optional, Type
 from langchain_core.prompts import PromptTemplate
 from lmnr import Laminar, observe
 from pydantic import BaseModel
+import os
+import browser_use.controller.selenium_snippets as selenium_snippets
 
 from browser_use.agent.views import ActionModel, ActionResult
 from browser_use.browser.context import BrowserContext
@@ -33,11 +35,33 @@ class Controller:
 		self,
 		exclude_actions: list[str] = [],
 		output_model: Optional[Type[BaseModel]] = None,
+		save_selenium_code: Optional[str] = None,
+		save_py: Optional[str] = None,
 	):
+		if not save_py:
+			save_py = "output"
+
+		self.save_py = save_py
+		self.save_selenium_code = save_selenium_code
+
+		if self.save_selenium_code and '/' not in self.save_selenium_code:
+			self.save_selenium_code = f'{self.save_selenium_code}/'
+
+		self._save_selenium_code(selenium_snippets.initial_selenium_code, overwrite=True)
 		self.exclude_actions = exclude_actions
 		self.output_model = output_model
 		self.registry = Registry(exclude_actions)
 		self._register_default_actions()
+
+	def _save_selenium_code(self, selenium_action: str, overwrite: bool = False) -> None:
+		"""Create directory and save Selenium action to a separate code file if path is specified"""
+		if not self.save_selenium_code:
+			return 
+		os.makedirs(os.path.dirname(self.save_selenium_code), exist_ok=True)        # Save the Selenium action to a dedicated .py file per action
+		file_path = f"{self.save_selenium_code}{self.save_py}.py"
+
+		with open(file_path, 'w' if overwrite else 'a', encoding='utf-8') as f:
+			f.write(selenium_action + '\n')
 
 	def _register_default_actions(self):
 		"""Register all default browser actions"""
@@ -60,10 +84,15 @@ class Controller:
 		)
 		async def search_google(params: SearchGoogleAction, browser: BrowserContext):
 			page = await browser.get_current_page()
-			await page.goto(f'https://www.google.com/search?q={params.query}&udm=14')
+			url = f'https://www.google.com/search?q={params.query}&udm=14'
+			await page.goto(url)
 			await page.wait_for_load_state()
 			msg = f'🔍  Searched for "{params.query}" in Google'
 			logger.info(msg)
+		
+			selenium_code = selenium_snippets.go_to(url)
+			self._save_selenium_code(selenium_code)
+
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Navigate to URL in the current tab', param_model=GoToUrlAction)
@@ -73,6 +102,10 @@ class Controller:
 			await page.wait_for_load_state()
 			msg = f'🔗  Navigated to {params.url}'
 			logger.info(msg)
+
+			selenium_code = selenium_snippets.go_to(params.url)	
+			self._save_selenium_code(selenium_code)
+
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Go back', param_model=NoParamsAction)
@@ -80,6 +113,10 @@ class Controller:
 			await browser.go_back()
 			msg = '🔙  Navigated back'
 			logger.info(msg)
+
+			selenium_code = selenium_snippets.back()
+			self._save_selenium_code(selenium_code)
+
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Element Interaction Actions
@@ -109,6 +146,9 @@ class Controller:
 				else:
 					msg = f'🖱️  Clicked button with index {params.index}: {element_node.get_all_text_till_next_clickable_element(max_depth=2)}'
 
+				selenium_code = selenium_snippets.click(element_node.xpath)
+				self._save_selenium_code(selenium_code)
+
 				logger.info(msg)
 				logger.debug(f'Element xpath: {element_node.xpath}')
 				if len(session.context.pages) > initial_pages:
@@ -116,6 +156,8 @@ class Controller:
 					msg += f' - {new_tab_msg}'
 					logger.info(new_tab_msg)
 					await browser.switch_to_tab(-1)
+					selenium_code = selenium_snippets.switch_to_tab(-1)
+					self._save_selenium_code(selenium_code)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				logger.warning(f'Element not clickable with index {params.index} - most likely the page changed')
@@ -137,6 +179,10 @@ class Controller:
 			msg = f'⌨️  Input {params.text} into index {params.index}'
 			logger.info(msg)
 			logger.debug(f'Element xpath: {element_node.xpath}')
+
+			selenium_code = selenium_snippets.input_txt(element_node.xpath, params.text)
+			self._save_selenium_code(selenium_code)
+			
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Tab Management Actions
@@ -148,6 +194,10 @@ class Controller:
 			await page.wait_for_load_state()
 			msg = f'🔄  Switched to tab {params.page_id}'
 			logger.info(msg)
+
+			selenium_code = selenium_snippets.switch_to_tab(params.page_id)	
+			self._save_selenium_code(selenium_code)
+
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Open url in new tab', param_model=OpenTabAction)
@@ -155,6 +205,10 @@ class Controller:
 			await browser.create_new_tab(params.url)
 			msg = f'🔗  Opened new tab with {params.url}'
 			logger.info(msg)
+
+			selenium_code = selenium_snippets.open_tab(params.url)
+			self._save_selenium_code(selenium_code)
+
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Content Actions
@@ -191,6 +245,10 @@ class Controller:
 			else:
 				await page.evaluate('window.scrollBy(0, window.innerHeight);')
 
+			viewport = page.viewport_size
+			selenium_code = selenium_snippets.scroll_down(params.amount, viewport=viewport)
+			self._save_selenium_code(selenium_code)
+
 			amount = f'{params.amount} pixels' if params.amount is not None else 'one page'
 			msg = f'🔍  Scrolled down the page by {amount}'
 			logger.info(msg)
@@ -214,6 +272,11 @@ class Controller:
 			amount = f'{params.amount} pixels' if params.amount is not None else 'one page'
 			msg = f'🔍  Scrolled up the page by {amount}'
 			logger.info(msg)
+
+			viewport = page.viewport_size
+			selenium_code = selenium_snippets.scroll_up(params.amount, viewport=viewport)
+			self._save_selenium_code(selenium_code)
+			
 			return ActionResult(
 				extracted_content=msg,
 				include_in_memory=True,
@@ -230,6 +293,10 @@ class Controller:
 			await page.keyboard.press(params.keys)
 			msg = f'⌨️  Sent keys: {params.keys}'
 			logger.info(msg)
+
+			selenium_code = selenium_snippets.send_keys(params.keys)
+			self._save_selenium_code(selenium_code)
+
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action(
@@ -253,6 +320,10 @@ class Controller:
 							await asyncio.sleep(0.5)  # Wait for scroll to complete
 							msg = f'🔍  Scrolled to text: {text}'
 							logger.info(msg)
+
+							selenium_code = selenium_snippets.scroll_to_text(text)
+							self._save_selenium_code(selenium_code)
+							
 							return ActionResult(extracted_content=msg, include_in_memory=True)
 					except Exception as e:
 						logger.debug(f'Locator attempt failed: {str(e)}')
@@ -414,6 +485,9 @@ class Controller:
 
 							msg = f'selected option {text} with value {selected_option_values}'
 							logger.info(msg + f' in frame {frame_index}')
+							
+							selenium_code = selenium_snippets.select_dropdown_option(dom_element.xpath, text)
+							self._save_selenium_code(selenium_code)
 
 							return ActionResult(extracted_content=msg, include_in_memory=True)
 
