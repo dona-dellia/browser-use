@@ -82,13 +82,13 @@ context = BrowserContext(browser=browser, config=config)
 #informacoes pessoais
 password = os.getenv("PASSWORD")
 vdi_api_key: str = os.getenv("VDI_API_KEY") # type: ignore
-sensitive_data = {'x_name': "PEDRO_FERNANDES", 'x_password': password}
+sensitive_data = {'x_name': "R_RODRIGUES", 'x_password': password}
 
 
 initial_actions = [
 	{'open_tab': {'url': 'https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home'}},
 	{"go_to_url":{"url":"https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home"}},
-	{"input_text":{"index":2,"text":"PEDRO_FERNANDES"}},
+	{"input_text":{"index":2,"text":"R_RODRIGUES"}},
 	{"input_text":{"index":4,"text":password}},
 	{"click_element":{"index":6}},
 	
@@ -96,7 +96,7 @@ initial_actions = [
 #20 23
 llm= ChatOpenAI(
         base_url="https://genai-api-dev.dell.com/v1",
-        model="llama-3-2-11b-vision-instruct",
+        model="llama-3-3-70b-instruct",
         api_key=SecretStr(vdi_api_key),
         http_async_client=httpx.AsyncClient(verify=False),
         timeout=30
@@ -104,11 +104,11 @@ llm= ChatOpenAI(
     )
 agent = Agent(
 		task=(
-			"""0.in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home
-   			1. Click in the change objects page
-      2. Enter change number pnr: PNR14551G
-      3. Click in GO button
-      4. check if the all the affected regions in the table are marked as Sucess"""
+			"""
+    GIVEN a user views the Change Objects landing page
+    WHEN the user selects to search by the STATUS field
+    THEN the Ad Hoc status should be available as a search criteria and displayed in the search results
+            """
 		),
 		llm=llm,
 		use_vision=False,
@@ -117,7 +117,8 @@ agent = Agent(
 		validate_output=False,
 		browser_context=context,
 		controller=controller,
-		sensitive_data=sensitive_data
+		sensitive_data=sensitive_data,
+        save_conversation_path="C:\\Users\\R_Rodrigues\\Documents\\projetos\\browser-use\\logs"
 	)
 async def main():
 

@@ -564,11 +564,13 @@ class Agent:
 
 				await self.step()
 
+				print(self.history.is_done())
+				print(self.history)
+
 				if self.history.is_done():
 					if self.validate_output and step < max_steps - 1:
 						if not await self._validate_output():
 							continue
-
 					logger.info('✅ Task completed successfully')
 					if self.register_done_callback:
 						self.register_done_callback(self.history)
@@ -622,6 +624,7 @@ class Agent:
 
 	async def _validate_output(self) -> bool:
 		"""Validate the output of the last action is what the user wanted"""
+		print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 		system_msg = (
 			f'You are a validator of an agent who interacts with a browser. '
 			f'Validate if the output of last action is what the user wanted and if the task is completed. '
