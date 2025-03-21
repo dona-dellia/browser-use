@@ -68,7 +68,7 @@ class Agent:
 		llm: BaseChatModel,
 		browser: Browser | None = None,
 		browser_context: BrowserContext | None = None,
-		controller: Controller = Controller(),
+		controller: Controller = Controller(save_py="code", save_selenium_code="output/"),
 		use_vision: bool = True,
 		use_vision_for_planner: bool = False,
 		save_conversation_path: Optional[str] = None,
