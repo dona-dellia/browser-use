@@ -2,6 +2,8 @@
 
 from os import listdir
 from os.path import isfile, join
+import json
+
 
 CONVERSATION_PATH = '../verification/US/'
 LEN_EXPLANATION = 200
@@ -27,6 +29,33 @@ def get_steps_of_tasks(type, us_id):
     # "evaluation_previous_goal" in first file is always Unknown
     logs = logs[1:]
     return logs
+
+def evalate_efficient_amount_steps(us_id, type):
+    """
+    """
+    #Aqui é importante saber se cumpriu a tarefa?
+
+    test_case_steps = count_tastcase_step(us_id)
+    logs = get_steps_of_tasks(type, us_id)
+
+    efficiency = test_case_steps/len(logs)
+    print(round(efficiency,2))
+
+
+def count_tastcase_step(us_id):
+    """
+    """
+    path = CONVERSATION_PATH+str(us_id)+"/testcase/testcase.json"
+    with open(path, 'r', encoding="utf-8") as file:
+        content = file.read()
+        json_file = json.loads(content)
+    
+    return(len(json_file["description"]))
+
+def evaluate_US_perform():
+    """
+    """
+    pass
 
 def evaluate_task_perfom(us_id, type):
     """
@@ -93,7 +122,8 @@ def print_evaluate_task(**kwords):
 
 if __name__ == '__main__':
     #test
-    us_id = 1
-    precision = evaluate_task_perfom(us_id, "E1")
-    print_evaluate_task(**precision)
+
+    #precision = evaluate_task_perfom(us_id, "E1")
+    #print_evaluate_task(**precision)
+    evalate_efficient_amount_steps(1, "raw")
  
