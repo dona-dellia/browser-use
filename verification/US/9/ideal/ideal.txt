@@ -1,0 +1,7 @@
+GIVEN a user is on the 'Owner information' page, on the component Pets and Visits and click on the Add Visit button 
+WHEN they select a date, a description and click on the Add Visit button 
+THEN the system should display the Pets and Visit component with all the visits associated to the pet
+
+GIVEN a pet owner is on the 'Owner Information' page, on the 'Pets and Visits' component, and clicks on the 'Add Visit' button
+WHEN they attempt to submit the form without filling in the visit description
+THEN the system should display an error message stating that the visit description is required and prevent form submission.

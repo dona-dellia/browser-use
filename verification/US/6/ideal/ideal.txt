@@ -1,0 +1,3 @@
+GIVEN the user is on the Bill of Material Maintenance page
+WHEN the user tries to submit the form without selecting an 'Effectivity Date'
+THEN the form should be submitted successfully without an error

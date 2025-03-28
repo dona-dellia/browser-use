@@ -1,0 +1,3 @@
+GIVEN the user is on the Change Objects landing page and has the necessary permissions to view and search for change objects, 
+WHEN they select the 'STATUS' field in the search form and choose 'WD' as a search criterion, 
+THEN the 'WD' status should be available as a search option in the 'Status' multiple selection field, and the search results should display all change objects with a status of 'WD' after clicking the 'GO' button.

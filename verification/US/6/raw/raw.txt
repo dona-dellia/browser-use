@@ -1,0 +1,3 @@
+GIVEN the user is on the BOM Maint page
+WHEN the user leaves effectivity date field empty
+THEN the form should be submitted successfully

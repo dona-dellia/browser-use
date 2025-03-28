@@ -1,0 +1,3 @@
+GIVEN the user with READ_ONLY permission is on the Deviations page
+WHEN the page is loaded
+THEN the 'Upload Template' button should be displayed and be disabled by default

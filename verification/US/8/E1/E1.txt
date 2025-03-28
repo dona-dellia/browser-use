@@ -1,0 +1,3 @@
+GIVEN the user is on the 'Add Owner' page, WHEN they fill out all the required fields ('First Name', 'Last Name', 'Address', 'City', 'Telephone') and click the 'Add Owner' button, THEN the new owner's information is saved and displayed.
+
+GIVEN the user is on the 'Add Owner' page, WHEN they leave any of the required fields empty and click the 'Add Owner' button, THEN an error message is displayed requiring all fields to be filled.

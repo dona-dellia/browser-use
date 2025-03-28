@@ -1,0 +1,3 @@
+GIVEN the user is on the PLT bom page
+WHEN the user enters PLT00006060 and submits the search
+THEN the results should display pilot bom PLT00006060 matching the provided number

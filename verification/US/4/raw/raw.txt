@@ -1,0 +1,3 @@
+GIVEN the user enters on the pilot bom search page.
+WHEN the page is loaded
+THEN the PLT bom widget should display the correct regions

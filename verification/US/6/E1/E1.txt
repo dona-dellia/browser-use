@@ -1,0 +1,1 @@
+GIVEN the user is on the BOM Maint page and has filled in the required fields (BOM Facility and Item Number) but left the 'Effective Date' field empty, WHEN they click the 'GO' or 'SAVE' button to submit the form, THEN the form should be submitted successfully without displaying any error related to the 'Effective Date' field

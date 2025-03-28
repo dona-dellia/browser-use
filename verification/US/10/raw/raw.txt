@@ -1,0 +1,1 @@
+GIVEN a user views the CO search results WHEN the user click on the arrow next to the originator column THEN the search results must be sorted by Originator in alphabetical order

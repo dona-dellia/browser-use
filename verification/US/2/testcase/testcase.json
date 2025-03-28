@@ -1,0 +1,28 @@
+{
+    "test_cases": [
+        {
+            "ID": "CT01PSM-1234",
+            "title": "View Waiting Deviation status in search dropdown menu",
+            "description": [
+                "The Prism CM Adapter Delivery Team navigates to the Change Objects landing page.",
+                "The user selects to search by the Status field.",
+                "The system retrieves and displays a list of available statuses, including 'Waiting Deviation'."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        },
+        {
+            "ID": "CT02PSM-1234",
+            "title": "Verify Waiting Deviation status display when selected",
+            "description": [
+                "The Prism CM Adapter Delivery Team navigates to the Change Objects landing page.",
+                "The user selects 'Waiting Deviation' from the Status field.",
+                "The system displays the Waiting Deviation status details."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

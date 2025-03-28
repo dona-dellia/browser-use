@@ -1,0 +1,32 @@
+{
+    "test_cases": [
+        {
+            "ID": "CT01US1234",
+            "title": "Record visit details for a pet",
+            "description": [
+                "The veterinarian navigates to the 'Owner Information' page and clicks on the 'Add Visit' button.",
+                "The system displays the 'Pets and Visits' component with a blank field for 'Date' and 'Description'.",
+                "The user selects a 'Date' and enters a 'Description' for the visit.",
+                "The user clicks the 'Add Visit' button.",
+                "The system displays the 'Pets and Visits' component with the recorded visit details."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        },
+        {
+            "ID": "CT02US1234",
+            "title": "Error message for missing visit description",
+            "description": [
+                "The veterinarian navigates to the 'Owner Information' page and clicks on the 'Add Visit' button.",
+                "The system displays the 'Pets and Visits' component with a blank field for 'Date' and 'Description'.",
+                "The user selects a 'Date' but leaves the 'Description' field blank.",
+                "The user clicks the 'Add Visit' button.",
+                "The system displays an error message stating that the visit description is required and prevents form submission."
+            ],
+            "acceptance_criteria_related": "2",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

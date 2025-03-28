@@ -1,0 +1,3 @@
+GIVEN a user views the Change Objects landing page, informs dates in both 'Effective from date' and 'Effective End Date' fields, click in 'GO' and wait for the Change Objects results to show
+WHEN the user click on the arrow right next to the 'Originator' column when the mouse hover the column name
+THEN the search results must be sorted by Originator in alphabetical order

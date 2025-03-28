@@ -1,0 +1,30 @@
+{
+    "test_cases": [
+        {
+            "ID": "CT01PSM-01",
+            "title": "Successfully register a new pet owner",
+            "description": [
+                "The receptionist navigates to the 'Find Owner' page;",
+                "The receptionist clicks the 'Add Owner' button;",
+                "The receptionist fills out the form with a valid name, last name, address, city, and telephone number;",
+                "The system displays the Owner Information screen;"
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        },
+        {
+            "ID": "CT02PSM-01",
+            "title": "Failed registration with missing name field",
+            "description": [
+                "The receptionist navigates to the 'Find Owner' page;",
+                "The receptionist clicks the 'Add Owner' button;",
+                "The receptionist attempts to submit the form without filling in the name field;",
+                "The system displays an error message: 'No field can be left empty' and prevents form submission;"
+            ],
+            "acceptance_criteria_related": "2",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

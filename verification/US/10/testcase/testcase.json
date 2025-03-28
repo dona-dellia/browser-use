@@ -1,0 +1,19 @@
+{
+"test_cases": [
+        {
+            "ID": "CT01PSM-01",
+            "title": "Search for Change Objects in the using dates and order by 'Originator' column",
+            "description": [
+                "The Prism CM Adapter Delivery Team navigates to the Change Objects landing page.",
+                "The user enters dates in both 'Effective from date' and 'Effective End Date' fields.",
+                "The user clicks the 'GO' button.",
+                "The system retrieves and displays a list of Change Objects.",
+                "The user hovers over the 'Originator' column name and clicks the arrow next to it.",
+                "The system sorts the Change Objects by 'Originator' in alphabetical order."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

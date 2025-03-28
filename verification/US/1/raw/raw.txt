@@ -1,0 +1,3 @@
+GIVEN a user views the Deviations landing page 
+WHEN he searches selecting type emergency and may 21st 2001 as end 
+THEN an error an error is showed

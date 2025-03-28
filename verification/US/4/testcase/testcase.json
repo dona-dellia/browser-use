@@ -1,0 +1,16 @@
+{
+"test_cases": [
+        {
+            "ID": "CT01PSM-01",
+            "title": "Verify 'Pilot BOMs' widget displays correct regions",
+            "description": [
+                "The user navigates to the Pilot BOMs Search page.",
+                "The page is loaded.",
+                "The user checks the 'Pilot BOMs' widget to verify the display of correct regions: APCC, BHR, CCC2, CCC4, DAO, EMEA."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

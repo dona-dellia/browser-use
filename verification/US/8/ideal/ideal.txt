@@ -1,0 +1,7 @@
+GIVEN a receptionist is on the 'Find Owner' page and click in the Add Owner button 
+WHEN they fill out the form with name, last name, address, city and telephone number 
+THEN the system should display the Owner Information screen.
+
+GIVEN a receptionist is on the 'Find Owner' page and clicks the 'Add Owner' button
+WHEN they attempt to submit the form without filling the name field 
+THEN the system should display an error message stating that no field can be left empty and prevent form submission.

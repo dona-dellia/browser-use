@@ -1,0 +1,17 @@
+{
+"test_cases": [
+        {
+            "ID": "CT01PSM-01",
+            "title": "Verify 'GO' button is enabled after filling all required fields",
+            "description": [
+                "The user navigates to the Bill of Material Maintenance page.",
+                "The user fills in all required fields on the page.",
+                "The system checks the state of the 'GO' button.",
+                "The 'GO' button is enabled and available for clicking."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

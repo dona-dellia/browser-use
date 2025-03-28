@@ -1,0 +1,2 @@
+GIVEN a user is viewing a pet's information and wants to add a visit, WHEN they fill in the 'Date' and 'Description' fields and click the 'Add Visit' button, THEN the system should add the new visit to the pet's visit history and display all visits associated with the pet
+GIVEN a user is viewing a pet's information and wants to add a visit, WHEN they leave the 'Description' field empty and click the 'Add Visit' button, THEN the system should display an error message requiring the user to fill in the 'Description' field.

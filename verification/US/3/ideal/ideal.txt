@@ -1,0 +1,1 @@
+GIVEN the user is on the Bill of Material Maintenance page WHEN the user fills all required fields THEN the 'GO' button should become enabled

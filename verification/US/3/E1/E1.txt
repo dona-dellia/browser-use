@@ -1,0 +1,3 @@
+GIVEN the user is on the BOM Maint page, 
+WHEN the user selects a valid 'BOM Facility', enters a valid 'Item Number', and chooses an 'Effective Date', 
+THEN the 'GO' button should become enabled, allowing the user to retrieve the BOM details for the specified item.

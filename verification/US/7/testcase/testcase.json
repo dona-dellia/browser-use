@@ -1,0 +1,18 @@
+{
+"test_cases": [
+        {
+            "ID": "CT01PSM-01",
+            "title": "Verify 'Upload Template' button is disabled by default",
+            "description": [
+                "The user with READ_ONLY permission logs into the application.",
+                "The user navigates to the Deviations page.",
+                "The system displays the 'Upload Template' button.",
+                "The 'Upload Template' button is checked for being disabled by default.",
+                "The button is found to be disabled."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}

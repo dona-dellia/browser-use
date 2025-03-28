@@ -1,0 +1,7 @@
+GIVEN a user is on the owner page and wants to add a pet owner 
+WHEN they fill out the form  
+THEN the system should display the owner Information screen
+
+GIVEN a user is on the owner page and wants to add a pet owner 
+WHEN they leave the form with the name field empty 
+THEN the system should display an error message

@@ -1,0 +1,3 @@
+GIVEN a user views the Change Objects landing page 
+WHEN the user selects to search by the STATUS field 
+THEN the WD status should be available as a search criteria and displayed in the search results

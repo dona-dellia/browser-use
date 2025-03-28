@@ -1,0 +1,7 @@
+GIVEN a user is on the component pets and pisits and wants to add a visit
+WHEN they fill the fields
+THEN the system should display all the visits associated to the pet
+
+GIVEN a user is on the component pets and pisits and wants to add a visit
+WHEN they leave the form with the description field empty 
+THEN the system should display an error message

@@ -1,0 +1,119 @@
+INFO     [browser_use] BrowserUse logging setup complete with level info
+INFO     [root] Anonymized telemetry enabled. See https://docs.browser-use.com/development/telemetry for more information.
+INFO     [agent] Saving conversation to ./verification/US/1/raw/log/
+INFO     [agent] 🚀 Starting task: GIVEN a user views the Deviations landing page 
+WHEN he searches selecting type emergency and may 21st 2001 as end 
+THEN an error an error is showed
+INFO     [agent] 📍 Step 1
+INFO     [agent] 🤷 Eval: Unknown - No previous goal
+INFO     [agent] 🧠 Memory: Task started. Need to open Deviations landing page. 0 out of 1 pages opened.
+INFO     [agent] 🎯 Next goal: Open Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"go_to_url":{"url":"https://www.deviations.net/"}}
+INFO     [controller] 🔗  Navigated to https://www.deviations.net/
+INFO     [agent] 📍 Step 2
+INFO     [agent] 👍 Eval: Success - Navigated to Deviations landing page
+INFO     [agent] 🧠 Memory: Opened Deviations landing page. Need to search for type emergency and end date May 21st 2001. 0 out of 1 searches completed.
+INFO     [agent] 🎯 Next goal: Find search bar and select type emergency
+INFO     [agent] 🛠️  Action 1/1: {"click_element":{"index":1}}
+INFO     [controller] 🖱️  Clicked button with index 1: 
+INFO     [agent] 📍 Step 3
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 1.000000 seconds
+INFO     [agent] 👍 Eval: Success - Navigated to Deviations landing page
+INFO     [agent] 🧠 Memory: Opened Deviations landing page. Need to search for type emergency and end date May 21st 2001. 0 out of 1 searches completed.
+INFO     [agent] 🎯 Next goal: Find search bar and select type emergency
+INFO     [agent] 🛠️  Action 1/1: {"click_element":{"index":1}}
+INFO     [controller] 🖱️  Clicked button with index 1: 
+INFO     [agent] 📍 Step 4
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 26.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 1.000000 seconds
+INFO     [agent] ⚠ Eval: Failed - Not on the correct page
+INFO     [agent] 🧠 Memory: Not on the correct page. Need to go back to the Deviations landing page and search for type emergency and end date May 21st 2001. 0 out of 1 searches completed.
+INFO     [agent] 🎯 Next goal: Go back to the Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 5
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 41.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 1.000000 seconds
+INFO     [agent] ⚠ Eval: Failed - On the wrong page
+INFO     [agent] 🧠 Memory: Not on the Deviations landing page. Need to go back to the Deviations landing page and search for type emergency and end date May 21st 2001. 0 out of 1 searches completed.
+INFO     [agent] 🎯 Next goal: Go back to the Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 6
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 44.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 2.000000 seconds
+INFO     [agent] ⚠ Eval: Failed - On the wrong page
+INFO     [agent] 🧠 Memory: Not on the Deviations landing page. Need to go back to the Deviations landing page and search for type emergency and end date May 21st 2001. 0 out of 1 searches completed.
+INFO     [agent] 🎯 Next goal: Go back to the Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 7
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 45.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 1.000000 seconds
+INFO     [agent] 🤷 Eval: Unknown - No previous goal
+INFO     [agent] 🧠 Memory: Started with the ultimate task: GIVEN a user views the Deviations landing page WHEN he searches selecting type emergency and may 21st 2001 as end THEN an error an error is showed. Need to navigate to the Deviations landing page. 0 out of 1 pages opened.
+INFO     [agent] 🎯 Next goal: Navigate to Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 8
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 46.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 2.000000 seconds
+INFO     [agent] 🤷 Eval: Unknown - No previous goal
+INFO     [agent] 🧠 Memory: Started with the ultimate task: GIVEN a user views the Deviations landing page WHEN he searches selecting type emergency and may 21st 2001 as end THEN an error an error is showed. Need to navigate to the Deviations landing page. 0 out of 1 pages opened.
+INFO     [agent] 🎯 Next goal: Navigate to Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 9
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 47.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 2.000000 seconds
+INFO     [agent] 🤷 Eval: Unknown - No previous goal
+INFO     [agent] 🧠 Memory: Started with the ultimate task: GIVEN a user views the Deviations landing page WHEN he searches selecting type emergency and may 21st 2001 as end THEN an error an error is showed. Need to navigate to the Deviations landing page. 0 out of 1 pages opened.
+INFO     [agent] 🎯 Next goal: Navigate to Deviations landing page
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 10
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 48.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 2.000000 seconds
+INFO     [agent] 🤷 Eval: Unknown - No previous goal
+INFO     [agent] 🧠 Memory: Started with the ultimate task: GIVEN a user views the Deviations landing page WHEN he searches selecting type emergency and may 21st 2001 as end THEN an error an error is showed. Need to navigate to the Deviations landing page. 0 out of 1 pages opened.
+INFO     [agent] 🎯 Next goal: Navigate to Deviations landing page and select type emergency and end date May 21st 2001
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 11
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 50.000000 seconds
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 2.000000 seconds
+INFO     [agent] 🤷 Eval: Unknown - No previous goal
+INFO     [agent] 🧠 Memory: Started with the ultimate task: GIVEN a user views the Deviations landing page WHEN he searches selecting type emergency and may 21st 2001 as end THEN an error an error is showed. Need to navigate to the Deviations landing page. 0 out of 1 pages opened.
+INFO     [agent] 🎯 Next goal: Navigate to Deviations landing page and select type emergency and end date May 21st 2001
+INFO     [agent] 🛠️  Action 1/1: {"switch_tab":{"page_id":0}}
+INFO     [controller] 🔄  Switched to tab 0
+INFO     [agent] 📍 Step 12
+INFO     [groq._base_client] Retrying request to /openai/v1/chat/completions in 39.000000 seconds
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...
+INFO     [agent] 📍 Step 12
+WARNING  [browser] Page load failed, continuing...

@@ -1,0 +1,17 @@
+{
+"test_cases": [
+        {
+            "ID": "CT01US-PLT",
+            "title": "Display PLT number in search results",
+            "description": [
+                "The user navigates to the Pilot BOMs Search page.",
+                "The user enters the valid 'PLT Number' PLT00006060 in the search field.",
+                "The user submits the search.",
+                "The system displays the search results containing 'PILOT BOM: PLT00006060' matching the provided number."
+            ],
+            "acceptance_criteria_related": "1",
+            "start_url": "https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home",
+            "status": "PENDING"
+        }
+    ]
+}
