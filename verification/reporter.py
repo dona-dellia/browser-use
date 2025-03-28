@@ -7,7 +7,7 @@ import itertools
 from tasks import evaluate_task_perfom
 
 ROOT = "../verification/US/"
-ENRICHMENT = ["raw", "E1", "E2"]
+ENRICHMENT = ["raw", "E1"]
 
 def get_Us_names(path):
     """

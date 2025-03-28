@@ -138,7 +138,7 @@ async def us_executor_by_id(us_id, type):
      
 async def main():
      us_id = 1
-     await us_executor_by_id(us_id, 'E1')
+     await us_executor_by_id(us_id, 'raw')
 
 
 if __name__ == '__main__':

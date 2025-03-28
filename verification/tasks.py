@@ -123,7 +123,7 @@ def print_evaluate_task(**kwords):
 if __name__ == '__main__':
     #test
 
-    #precision = evaluate_task_perfom(us_id, "E1")
-    #print_evaluate_task(**precision)
-    evalate_efficient_amount_steps(1, "raw")
+    precision = evaluate_task_perfom(1, "E1")
+    print_evaluate_task(**precision)
+    #evalate_efficient_amount_steps(1, "raw")
  
