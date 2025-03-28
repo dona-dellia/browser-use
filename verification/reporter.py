@@ -7,15 +7,7 @@ import itertools
 from tasks import evaluate_task_perfom
 
 ROOT = "../verification/US/"
-ENRICHMENT = ["raw", "E1"]
-
-def get_Us_names(path):
-    """
-    """
-    uss = [int(f) for f in listdir(ROOT)]
-    uss = sorted(uss)
-    uss = ['US/'+str(f) for f in uss]
-    return uss
+ENRICHMENT = ["raw", "ideal" "E1"]
 
 def get_precision_for_all_US():
     """
@@ -28,9 +20,9 @@ def get_precision_by_US(id_us, type):
     precision = evaluate_task_perfom(id_us, type)
     return precision
 
+'''
 def execute_all_US():
-    """
-    """
+    
     uss = get_Us_names(ROOT)
     combinations = list(itertools.product(uss, ENRICHMENT))
     paths = [a+'/'+b+'/' for a,b in combinations]
@@ -47,6 +39,7 @@ def execute_US_by_id(us_id):
     """
     """
     pass
+'''
 
 def heatmap(data, row_labels, col_labels, ax=None,
             cbar_kw=None, cbarlabel="", **kwargs):
@@ -165,7 +158,9 @@ def compare_enrichment():
     """
 
 if __name__ == '__main__':
-    compare_models()
+
+
+    #compare_models()
     
     results = []
     us_precision = []

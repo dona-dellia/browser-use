@@ -23,6 +23,7 @@ from langchain_core.prompts import PromptTemplate
 load_dotenv()
 
 CONVERSATION_PATH = "./verification/"
+ENRICHMENT = ["raw", "ideal" "E1"]
 
 #controle
 controller = Controller(exclude_actions=['search_google'])
@@ -112,9 +113,18 @@ def us_executor(us, path):
             save_conversation_path=path
         )
     return agent
-    
 
-async def us_executor_by_id(us_id, type):
+
+async def us_executor_by_id(us_id):
+     """
+     """
+     US_max = 10
+     for i in range(1,US_max+1,1):
+        for type in ENRICHMENT:
+            await us_executor_by_id_type(1, type)
+     
+
+async def us_executor_by_id_type(us_id, type):
     """
     
     """
@@ -138,7 +148,7 @@ async def us_executor_by_id(us_id, type):
      
 async def main():
      us_id = 1
-     await us_executor_by_id(us_id, 'raw')
+     await us_executor_by_id(us_id)
 
 
 if __name__ == '__main__':
