@@ -115,13 +115,13 @@ def us_executor(us, path):
     return agent
 
 
-async def us_executor_by_id(us_id):
+async def us_executor_by_ids():
      """
      """
      US_max = 10
      for i in range(1,US_max+1,1):
         for type in ENRICHMENT:
-            await us_executor_by_id_type(1, type)
+            await us_executor_by_id_type(i, type)
      
 
 async def us_executor_by_id_type(us_id, type):
@@ -147,8 +147,10 @@ async def us_executor_by_id_type(us_id, type):
     await browser.close()
      
 async def main():
-     us_id = 1
-     await us_executor_by_id(us_id)
+     """
+     Execute for all USs
+     """
+     await us_executor_by_ids()
 
 
 if __name__ == '__main__':
