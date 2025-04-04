@@ -314,9 +314,14 @@ class BrowserContext:
 	async def _initialize_session(self):
 		"""Initialize the browser session"""
 		logger.debug(f'🌎  Initializing new browser context with id: {self.context_id}')
+		print("AAA")
 
 		playwright_browser = await self.browser.get_playwright_browser()
+		print("BBB")
+  
 		context = await self._create_context(playwright_browser)
+		print("CCC")
+  
 		self._page_event_handler = None
 
 		# Get or create a page to use
@@ -370,6 +375,7 @@ class BrowserContext:
 		await active_page.wait_for_load_state('load')
 
 		self.active_tab = active_page
+		print("DDD")
 
 		return self.session
 

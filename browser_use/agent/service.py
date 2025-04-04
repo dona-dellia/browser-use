@@ -626,6 +626,7 @@ class Agent(Generic[Context]):
 
 	@time_execution_async('--get_next_action (agent)')
 	async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
+		print("chute")
 		"""Get next action from LLM based on current state"""
 		input_messages = self._convert_input_messages(input_messages)
 
@@ -647,63 +648,24 @@ class Agent(Generic[Context]):
 				logger.warning(f'Failed to parse model output: {output} {str(e)}')
 				raise ValueError('Could not parse response.')
 
-		elif self.tool_calling_method is None:
-			structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
-			try:
-				response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
-				parsed: AgentOutput | None = response['parsed']
+		elif True:
+			response_text = await self.llm.ainvoke(input_messages)
+			response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
+			response_text = self._remove_think_tags(response_text)
+			response_text = json.loads(response_text)
+			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
+				response_text = response_text["parameters"]
+			response_text = json.dumps(response_text)
 
-			except Exception as e:
-				logger.error(f'Failed to invoke model: {str(e)}')
-				raise LLMException(401, 'LLM API call failed') from e
+			parsed_json = extract_json_from_model_output(response_text)
+			print(f'parsed json: {parsed_json}')
+			parsed = self.AgentOutput(**parsed_json)
+
 
 		else:
 			logger.debug(f'Using {self.tool_calling_method} for {self.chat_model_library}')
 			structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True, method=self.tool_calling_method)
 			response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
-
-		# Handle tool call responses
-		if response.get('parsing_error') and 'raw' in response:
-			raw_msg = response['raw']
-			if hasattr(raw_msg, 'tool_calls') and raw_msg.tool_calls:
-				# Convert tool calls to AgentOutput format
-
-				tool_call = raw_msg.tool_calls[0]  # Take first tool call
-
-				# Create current state
-				tool_call_name = tool_call['name']
-				tool_call_args = tool_call['args']
-
-				current_state = {
-					'page_summary': 'Processing tool call',
-					'evaluation_previous_goal': 'Executing action',
-					'memory': 'Using tool call',
-					'next_goal': f'Execute {tool_call_name}',
-				}
-
-				# Create action from tool call
-				action = {tool_call_name: tool_call_args}
-
-				parsed = self.AgentOutput(current_state=current_state, action=[self.ActionModel(**action)])
-			else:
-				parsed = None
-		else:
-			parsed = response['parsed']
-
-		if not parsed:
-			try:
-				parsed_json = extract_json_from_model_output(response['raw'].content)
-				parsed = self.AgentOutput(**parsed_json)
-			except Exception as e:
-				logger.warning(f'Failed to parse model output: {response["raw"].content} {str(e)}')
-				raise ValueError('Could not parse response.')
-
-		# cut the number of actions to max_actions_per_step if needed
-		if len(parsed.action) > self.settings.max_actions_per_step:
-			parsed.action = parsed.action[: self.settings.max_actions_per_step]
-
-		if not (hasattr(self.state, 'paused') and (self.state.paused or self.state.stopped)):
-			log_response(parsed)
 
 		return parsed
 
@@ -753,8 +715,9 @@ class Agent(Generic[Context]):
 		self, max_steps: int = 100, on_step_start: AgentHookFunc | None = None, on_step_end: AgentHookFunc | None = None
 	) -> AgentHistoryList:
 		"""Execute the task with maximum number of steps"""
-
+		print("a")
 		loop = asyncio.get_event_loop()
+		print("b")
 
 		# Set up the Ctrl+C signal handler with callbacks specific to this agent
 		from browser_use.utils import SignalHandler
@@ -767,47 +730,57 @@ class Agent(Generic[Context]):
 			exit_on_second_int=True,
 		)
 		signal_handler.register()
+		print("c")
 
 		# Start non-blocking LLM connection verification
 		assert self.llm._verified_api_keys, 'Failed to verify LLM API keys'
+		print("d")
 
 		try:
 			self._log_agent_run()
+			print("e")
 
 			# Execute initial actions if provided
 			if self.initial_actions:
 				result = await self.multi_act(self.initial_actions, check_for_new_elements=False)
 				self.state.last_result = result
+			print("f")
 
 			for step in range(max_steps):
 				# Check if waiting for user input after Ctrl+C
 				if self.state.paused:
 					signal_handler.wait_for_resume()
 					signal_handler.reset()
+				print("g")
 
 				# Check if we should stop due to too many failures
 				if self.state.consecutive_failures >= self.settings.max_failures:
 					logger.error(f'❌ Stopping due to {self.settings.max_failures} consecutive failures')
 					break
-
+				print("h")
 				# Check control flags before each step
 				if self.state.stopped:
 					logger.info('Agent stopped')
 					break
-
+				print("i")
+				
 				while self.state.paused:
 					await asyncio.sleep(0.2)  # Small delay to prevent CPU spinning
 					if self.state.stopped:  # Allow stopping while paused
 						break
+				print("j")
 
 				if on_step_start is not None:
 					await on_step_start(self)
+				print("k")
 
 				step_info = AgentStepInfo(step_number=step, max_steps=max_steps)
 				await self.step(step_info)
+				print("l")
 
 				if on_step_end is not None:
 					await on_step_end(self)
+				print("m")
 
 				if self.state.history.is_done():
 					if self.settings.validate_output and step < max_steps - 1:
@@ -861,11 +834,15 @@ class Agent(Generic[Context]):
 	) -> list[ActionResult]:
 		"""Execute multiple actions"""
 		results = []
-
+		print("AA")
 		cached_selector_map = await self.browser_context.get_selector_map()
+		print("AA1")
+  
 		cached_path_hashes = set(e.hash.branch_path_hash for e in cached_selector_map.values())
+		print("BB")
 
 		await self.browser_context.remove_highlights()
+		print("CC")
 
 		for i, action in enumerate(actions):
 			if action.get_index() is not None and i != 0:
@@ -877,9 +854,11 @@ class Agent(Generic[Context]):
 					logger.info(msg)
 					results.append(ActionResult(extracted_content=msg, include_in_memory=True))
 					break
+			print("DD")
 
 			try:
 				await self._raise_if_stopped_or_paused()
+				print("EE")
 
 				result = await self.controller.act(
 					action,
@@ -891,6 +870,7 @@ class Agent(Generic[Context]):
 				)
 
 				results.append(result)
+				print("FF")
 
 				logger.debug(f'Executed action {i + 1} / {len(actions)}')
 				if results[-1].is_done or results[-1].error or i == len(actions) - 1:

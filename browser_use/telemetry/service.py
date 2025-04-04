@@ -39,7 +39,8 @@ class ProductTelemetry:
 		telemetry_disabled = os.getenv('ANONYMIZED_TELEMETRY', 'true').lower() == 'false'
 		self.debug_logging = os.getenv('BROWSER_USE_LOGGING_LEVEL', 'info').lower() == 'debug'
 
-		if telemetry_disabled:
+		if True:
+			print("aloo")
 			self._posthog_client = None
 		else:
 			logger.info(
@@ -55,12 +56,12 @@ class ProductTelemetry:
 			if not self.debug_logging:
 				posthog_logger = logging.getLogger('posthog')
 				posthog_logger.disabled = True
-
+		self._posthog_client = None
 		if self._posthog_client is None:
 			logger.debug('Telemetry disabled')
 
 	def capture(self, event: BaseTelemetryEvent) -> None:
-		if self._posthog_client is None:
+		if True:
 			return
 
 		if self.debug_logging:
@@ -71,7 +72,7 @@ class ProductTelemetry:
 		"""
 		Should not be thread blocking because posthog magically handles it
 		"""
-		if self._posthog_client is None:
+		if True:
 			return
 
 		try:
