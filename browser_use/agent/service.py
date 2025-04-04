@@ -440,16 +440,12 @@ class Agent:
 			response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
 			parsed: AgentOutput | None = response['parsed']
 		else:
-			print("A")
 			response_text = await self.llm.ainvoke(input_messages)
-			print("B")
 			response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
 			response_text = self._remove_think_tags(response_text)
 			response_text = json.loads(response_text)
 			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
 				response_text = response_text["parameters"]
-			#extract_page = {"extract_content": {"goal": f"Extract all visible text and structure related to the goal:{response_text["current_state"]["next_goal"]}"}}
-			#response_text["action"].append(extract_page)
 			response_text = json.dumps(response_text)
 
 			parsed_json = self.message_manager.extract_json_from_model_output(response_text)

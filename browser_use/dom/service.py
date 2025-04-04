@@ -32,7 +32,7 @@ class DomService:
 	) -> DOMState:
 		element_tree = await self._build_dom_tree(highlight_elements, focus_element, viewport_expansion)
 		selector_map = self._create_selector_map(element_tree)
-
+		#print(element_tree.clickable_elements_to_string())
 		return DOMState(element_tree=element_tree, selector_map=selector_map)
 
 	async def _build_dom_tree(
@@ -54,7 +54,6 @@ class DomService:
 
 		if html_to_dict is None or not isinstance(html_to_dict, DOMElementNode):
 			raise ValueError('Failed to parse HTML to dictionary')
-
 		return html_to_dict
 
 	def _create_selector_map(self, element_tree: DOMElementNode) -> SelectorMap:
