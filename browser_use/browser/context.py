@@ -1,5 +1,5 @@
 """
-Playwright browser on steroids.
+Selenium browser context implementation.
 """
 
 import asyncio
@@ -11,21 +11,28 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, TypedDict
+from typing import TYPE_CHECKING, Dict, List, Optional, TypedDict, Tuple, Any
+import traceback
 
-from playwright.async_api import Browser as PlaywrightBrowser
-from playwright.async_api import (
-	BrowserContext as PlaywrightBrowserContext,
-)
-from playwright.async_api import (
-	ElementHandle,
-	FrameLocator,
-	Page,
+# Selenium imports
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.common.exceptions import (
+	TimeoutException, 
+	StaleElementReferenceException,
+	ElementNotInteractableException,
+	NoSuchElementException,
+	WebDriverException
 )
 
 from browser_use.browser.views import BrowserError, BrowserState, TabInfo, URLNotAllowedError
 from browser_use.dom.service import DomService
-from browser_use.dom.views import DOMElementNode, SelectorMap
+from browser_use.dom.views import DOMElementNode, DOMTextNode, SelectorMap
 from browser_use.utils import time_execution_sync
 
 if TYPE_CHECKING:
@@ -48,15 +55,15 @@ class BrowserContextConfig:
 		cookies_file: None
 			Path to cookies file for persistence
 
-	        disable_security: False
-	                Disable browser security features
+		disable_security: False
+			Disable browser security features
 
 		minimum_wait_page_load_time: 0.5
 			Minimum time to wait before getting page state for LLM input
 
-	        wait_for_network_idle_page_load_time: 1.0
-	                Time to wait for network requests to finish before getting page state.
-	                Lower values may result in incomplete page loads.
+		wait_for_network_idle_page_load_time: 1.0
+			Time to wait for network requests to finish before getting page state.
+			Lower values may result in incomplete page loads.
 
 		maximum_wait_page_load_time: 5.0
 			Maximum time to wait for page load before proceeding anyway
@@ -70,20 +77,11 @@ class BrowserContextConfig:
 			}
 			Default browser window size
 
-		no_viewport: False
-			Disable viewport
-
-		save_recording_path: None
-			Path to save video recordings
-
 		save_downloads_path: None
-	        Path to save downloads to
-
-		trace_path: None
-			Path to save trace files. It will auto name the file with the TRACE_PATH/{context_id}.zip
+			Path to save downloads to
 
 		locale: None
-			Specify user locale, for example en-GB, de-DE, etc. Locale will affect navigator.language value, Accept-Language request header value as well as number and date formatting rules. If not provided, defaults to the system default locale.
+			Specify user locale, for example en-GB, de-DE, etc.
 
 		user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
 			custom user agent to use.
@@ -102,7 +100,7 @@ class BrowserContextConfig:
 			Include dynamic attributes in the CSS selector. If you want to reuse the css_selectors, it might be better to set this to False.
 	"""
 
-	cookies_file: str | None = None
+	cookies_file: Optional[str] = None
 	minimum_wait_page_load_time: float = 0.5
 	wait_for_network_idle_page_load_time: float = 1
 	maximum_wait_page_load_time: float = 5
@@ -111,27 +109,23 @@ class BrowserContextConfig:
 	disable_security: bool = False
 
 	browser_window_size: BrowserContextWindowSize = field(default_factory=lambda: {'width': 1280, 'height': 1100})
-	no_viewport: Optional[bool] = None
-
-	save_recording_path: str | None = None
-	save_downloads_path: str | None = None
-	trace_path: str | None = None
-	locale: str | None = None
+	save_downloads_path: Optional[str] = None
+	locale: Optional[str] = None
 	user_agent: str = (
-		'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36  (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
+		'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
 	)
 
 	highlight_elements: bool = True
 	viewport_expansion: int = 500
-	allowed_domains: list[str] | None = None
+	allowed_domains: Optional[List[str]] = None
 	include_dynamic_attributes: bool = True
 
 
 @dataclass
 class BrowserSession:
-	context: PlaywrightBrowserContext
-	current_page: Page
+	driver: webdriver.Remote
 	cached_state: BrowserState
+	original_window_handle: str
 
 
 class BrowserContext:
@@ -147,7 +141,8 @@ class BrowserContext:
 		self.browser = browser
 
 		# Initialize these as None - they'll be set up when needed
-		self.session: BrowserSession | None = None
+		self.session: Optional[BrowserSession] = None
+		self.dom_service = DomService()
 
 	async def __aenter__(self):
 		"""Async context manager entry"""
@@ -159,7 +154,7 @@ class BrowserContext:
 		await self.close()
 
 	async def close(self):
-		"""Close the browser instance"""
+		"""Close the browser context"""
 		logger.debug('Closing browser context')
 
 		try:
@@ -169,16 +164,15 @@ class BrowserContext:
 
 			await self.save_cookies()
 
-			if self.config.trace_path:
-				try:
-					await self.session.context.tracing.stop(path=os.path.join(self.config.trace_path, f'{self.context_id}.zip'))
-				except Exception as e:
-					logger.debug(f'Failed to stop tracing: {e}')
-
 			try:
-				await self.session.context.close()
+				# No need to close context in Selenium, as it's just the driver
+				# If we want to close the current window but keep the driver alive:
+				if len(self.session.driver.window_handles) > 1:
+					self.session.driver.close()  # Close current window
+					# Switch to first window
+					self.session.driver.switch_to.window(self.session.driver.window_handles[0])
 			except Exception as e:
-				logger.debug(f'Failed to close context: {e}')
+				logger.debug(f'Failed to close window: {e}')
 		finally:
 			self.session = None
 
@@ -187,9 +181,12 @@ class BrowserContext:
 		if self.session is not None:
 			logger.debug('BrowserContext was not properly closed before destruction')
 			try:
-				# Use sync Playwright method for force cleanup
-				if hasattr(self.session.context, '_impl_obj'):
-					asyncio.run(self.session.context._impl_obj.close())
+				# As a last resort, try to close window
+				try:
+					if len(self.session.driver.window_handles) > 1:
+						self.session.driver.close()  # Close current window
+				except:
+					pass
 				self.session = None
 			except Exception as e:
 				logger.warning(f'Failed to force close browser context: {e}')
@@ -198,30 +195,54 @@ class BrowserContext:
 		"""Initialize the browser session"""
 		logger.debug('Initializing browser context')
 
-		playwright_browser = await self.browser.get_playwright_browser()
+		driver = await self.browser.get_webdriver()
+		
+		# Configure window size
+		driver.set_window_size(
+			self.config.browser_window_size['width'],
+			self.config.browser_window_size['height']
+		)
 
-		context = await self._create_context(playwright_browser)
-		self._add_new_page_listener(context)
-		page = await context.new_page()
+		# Store original window handle
+		original_window = driver.current_window_handle
 
-		# Instead of calling _update_state(), create an empty initial state
-		initial_state = self._get_initial_state(page)
+		# Set up downloads directory if specified
+		if self.config.save_downloads_path:
+			# This would need to be set during driver creation, not here
+			# We'll assume it was done in browser.py
+			pass
+			
+		# Load cookies if they exist
+		if self.config.cookies_file and os.path.exists(self.config.cookies_file):
+			# First navigate to a page in the domain (required for cookie setting)
+			driver.get("about:blank")
+			
+			with open(self.config.cookies_file, 'r') as f:
+				cookies = json.load(f)
+				logger.info(f'Loaded {len(cookies)} cookies from {self.config.cookies_file}')
+				for cookie in cookies:
+					# Clean cookie data to handle format differences
+					if 'sameSite' in cookie:
+						if cookie['sameSite'] == 'None':
+							cookie['sameSite'] = 'Strict'
+					try:
+						driver.add_cookie(cookie)
+					except Exception as e:
+						logger.debug(f"Failed to add cookie: {e}")
+
+		# Create initial state - creates a blank page if needed
+		if not driver.current_url or driver.current_url == "data:,":
+			driver.get("about:blank")
+		
+		initial_state = self._get_initial_state()
 
 		self.session = BrowserSession(
-			context=context,
-			current_page=page,
+			driver=driver,
 			cached_state=initial_state,
+			original_window_handle=original_window,
 		)
+		
 		return self.session
-
-	def _add_new_page_listener(self, context: PlaywrightBrowserContext):
-		async def on_page(page: Page):
-			await page.wait_for_load_state()
-			logger.debug(f'New page opened: {page.url}')
-			if self.session is not None:
-				self.session.current_page = page
-
-		context.on('page', on_page)
 
 	async def get_session(self) -> BrowserSession:
 		"""Lazy initialization of the browser and related components"""
@@ -229,898 +250,809 @@ class BrowserContext:
 			return await self._initialize_session()
 		return self.session
 
-	async def get_current_page(self) -> Page:
-		"""Get the current page"""
+	async def get_current_driver(self) -> webdriver.Remote:
+		"""Get the current driver"""
 		session = await self.get_session()
-		return session.current_page
+		return session.driver
 
-	async def _create_context(self, browser: PlaywrightBrowser):
-		"""Creates a new browser context with anti-detection measures and loads cookies if available."""
-		if self.browser.config.cdp_url and len(browser.contexts) > 0:
-			context = browser.contexts[0]
-		elif self.browser.config.chrome_instance_path and len(browser.contexts) > 0:
-			# Connect to existing Chrome instance instead of creating new one
-			context = browser.contexts[0]
+	async def get_current_page(self):
+		"""
+		Compatibility method for Playwright migration.
+		In Selenium, there's no separate page object - we just return self since
+		the BrowserContext handles page operations directly.
+		"""
+		await self.get_session()  # Ensure session is initialized
+		return self
+		
+	async def goto(self, url: str):
+		"""
+		Compatibility method for Playwright migration.
+		Calls navigate_to method to handle URL navigation.
+		"""
+		return await self.navigate_to(url)
+
+	async def content(self) -> str:
+		"""
+		Compatibility method for Playwright migration.
+		Returns the full HTML content of the page.
+		"""
+		return await self.get_page_html()
+
+	async def wait_for_load_state(self, state: str = "load", timeout: Optional[float] = None):
+		"""
+		Compatibility method for Playwright migration.
+		Waits for a specific load state of the page.
+		
+		Args:
+			state: One of "load", "domcontentloaded", "networkidle". Defaults to "load".
+			timeout: Maximum time to wait in seconds. Defaults to config's maximum_wait_page_load_time.
+		"""
+		if state == "networkidle":
+			# For networkidle, wait a bit longer to ensure network requests complete
+			await self._wait_for_page_load(timeout_overwrite=timeout)
+			await asyncio.sleep(self.config.wait_for_network_idle_page_load_time)
 		else:
-			# Original code for creating new context
-			context = await browser.new_context(
-				viewport=self.config.browser_window_size,
-				no_viewport=False,
-				user_agent=self.config.user_agent,
-				java_script_enabled=True,
-				bypass_csp=self.config.disable_security,
-				ignore_https_errors=self.config.disable_security,
-				record_video_dir=self.config.save_recording_path,
-				record_video_size=self.config.browser_window_size,
-				locale=self.config.locale,
+			# For load and domcontentloaded, use standard wait
+			await self._wait_for_page_load(timeout_overwrite=timeout)
+
+	async def _wait_for_page_load(self, timeout_overwrite: Optional[float] = None):
+		"""Wait for the page to load"""
+		driver = await self.get_current_driver()
+		timeout = timeout_overwrite or self.config.maximum_wait_page_load_time
+		
+		# Wait for minimum time
+		await asyncio.sleep(self.config.minimum_wait_page_load_time)
+		
+		try:
+			# Wait for document ready state
+			WebDriverWait(driver, timeout).until(
+				lambda d: d.execute_script('return document.readyState') == 'complete'
 			)
-
-		if self.config.trace_path:
-			await context.tracing.start(screenshots=True, snapshots=True, sources=True)
-
-		# Load cookies if they exist
-		if self.config.cookies_file and os.path.exists(self.config.cookies_file):
-			with open(self.config.cookies_file, 'r') as f:
-				cookies = json.load(f)
-				logger.info(f'Loaded {len(cookies)} cookies from {self.config.cookies_file}')
-				await context.add_cookies(cookies)
-
-		# Expose anti-detection scripts
-		await context.add_init_script(
-			"""
-			// Webdriver property
-			Object.defineProperty(navigator, 'webdriver', {
-				get: () => undefined
-			});
-
-			// Languages
-			Object.defineProperty(navigator, 'languages', {
-				get: () => ['en-US']
-			});
-
-			// Plugins
-			Object.defineProperty(navigator, 'plugins', {
-				get: () => [1, 2, 3, 4, 5]
-			});
-
-			// Chrome runtime
-			window.chrome = { runtime: {} };
-
-			// Permissions
-			const originalQuery = window.navigator.permissions.query;
-			window.navigator.permissions.query = (parameters) => (
-				parameters.name === 'notifications' ?
-					Promise.resolve({ state: Notification.permission }) :
-					originalQuery(parameters)
-			);
-			(function () {
-				const originalAttachShadow = Element.prototype.attachShadow;
-				Element.prototype.attachShadow = function attachShadow(options) {
-					return originalAttachShadow.call(this, { ...options, mode: "open" });
-				};
-			})();
-			"""
-		)
-
-		return context
-
-	async def _wait_for_stable_network(self):
-		page = await self.get_current_page()
-
-		pending_requests = set()
-		last_activity = asyncio.get_event_loop().time()
-
-		# Define relevant resource types and content types
-		RELEVANT_RESOURCE_TYPES = {
-			'document',
-			'stylesheet',
-			'image',
-			'font',
-			'script',
-			'iframe',
-		}
-
-		RELEVANT_CONTENT_TYPES = {
-			'text/html',
-			'text/css',
-			'application/javascript',
-			'image/',
-			'font/',
-			'application/json',
-		}
-
-		# Additional patterns to filter out
-		IGNORED_URL_PATTERNS = {
-			# Analytics and tracking
-			'analytics',
-			'tracking',
-			'telemetry',
-			'beacon',
-			'metrics',
-			# Ad-related
-			'doubleclick',
-			'adsystem',
-			'adserver',
-			'advertising',
-			# Social media widgets
-			'facebook.com/plugins',
-			'platform.twitter',
-			'linkedin.com/embed',
-			# Live chat and support
-			'livechat',
-			'zendesk',
-			'intercom',
-			'crisp.chat',
-			'hotjar',
-			# Push notifications
-			'push-notifications',
-			'onesignal',
-			'pushwoosh',
-			# Background sync/heartbeat
-			'heartbeat',
-			'ping',
-			'alive',
-			# WebRTC and streaming
-			'webrtc',
-			'rtmp://',
-			'wss://',
-			# Common CDNs for dynamic content
-			'cloudfront.net',
-			'fastly.net',
-		}
-
-		async def on_request(request):
-			# Filter by resource type
-			if request.resource_type not in RELEVANT_RESOURCE_TYPES:
-				return
-
-			# Filter out streaming, websocket, and other real-time requests
-			if request.resource_type in {
-				'websocket',
-				'media',
-				'eventsource',
-				'manifest',
-				'other',
-			}:
-				return
-
-			# Filter out by URL patterns
-			url = request.url.lower()
-			if any(pattern in url for pattern in IGNORED_URL_PATTERNS):
-				return
-
-			# Filter out data URLs and blob URLs
-			if url.startswith(('data:', 'blob:')):
-				return
-
-			# Filter out requests with certain headers
-			headers = request.headers
-			if headers.get('purpose') == 'prefetch' or headers.get('sec-fetch-dest') in [
-				'video',
-				'audio',
-			]:
-				return
-
-			nonlocal last_activity
-			pending_requests.add(request)
-			last_activity = asyncio.get_event_loop().time()
-			# logger.debug(f'Request started: {request.url} ({request.resource_type})')
-
-		async def on_response(response):
-			request = response.request
-			if request not in pending_requests:
-				return
-
-			# Filter by content type if available
-			content_type = response.headers.get('content-type', '').lower()
-
-			# Skip if content type indicates streaming or real-time data
-			if any(
-				t in content_type
-				for t in [
-					'streaming',
-					'video',
-					'audio',
-					'webm',
-					'mp4',
-					'event-stream',
-					'websocket',
-					'protobuf',
-				]
-			):
-				pending_requests.remove(request)
-				return
-
-			# Only process relevant content types
-			if not any(ct in content_type for ct in RELEVANT_CONTENT_TYPES):
-				pending_requests.remove(request)
-				return
-
-			# Skip if response is too large (likely not essential for page load)
-			content_length = response.headers.get('content-length')
-			if content_length and int(content_length) > 5 * 1024 * 1024:  # 5MB
-				pending_requests.remove(request)
-				return
-
-			nonlocal last_activity
-			pending_requests.remove(request)
-			last_activity = asyncio.get_event_loop().time()
-			# logger.debug(f'Request resolved: {request.url} ({content_type})')
-
-		# Attach event listeners
-		page.on('request', on_request)
-		page.on('response', on_response)
-
-		try:
-			# Wait for idle time
-			start_time = asyncio.get_event_loop().time()
-			while True:
-				await asyncio.sleep(0.1)
-				now = asyncio.get_event_loop().time()
-				if len(pending_requests) == 0 and (now - last_activity) >= self.config.wait_for_network_idle_page_load_time:
-					break
-				if now - start_time > self.config.maximum_wait_page_load_time:
-					logger.debug(
-						f'Network timeout after {self.config.maximum_wait_page_load_time}s with {len(pending_requests)} '
-						f'pending requests: {[r.url for r in pending_requests]}'
-					)
-					break
-
-		finally:
-			# Clean up event listeners
-			page.remove_listener('request', on_request)
-			page.remove_listener('response', on_response)
-
-		logger.debug(f'Network stabilized for {self.config.wait_for_network_idle_page_load_time} seconds')
-
-	async def _wait_for_page_and_frames_load(self, timeout_overwrite: float | None = None):
-		"""
-		Ensures page is fully loaded before continuing.
-		Waits for either network to be idle or minimum WAIT_TIME, whichever is longer.
-		Also checks if the loaded URL is allowed.
-		"""
-		# Start timing
-		start_time = time.time()
-
-		# Wait for page load
-		try:
-			await self._wait_for_stable_network()
-
-			# Check if the loaded URL is allowed
-			page = await self.get_current_page()
-			await self._check_and_handle_navigation(page)
-		except URLNotAllowedError as e:
-			raise e
-		except Exception:
-			logger.warning('Page load failed, continuing...')
-			pass
-
-		# Calculate remaining time to meet minimum WAIT_TIME
-		elapsed = time.time() - start_time
-		remaining = max((timeout_overwrite or self.config.minimum_wait_page_load_time) - elapsed, 0)
-
-		logger.debug(f'--Page loaded in {elapsed:.2f} seconds, waiting for additional {remaining:.2f} seconds')
-
-		# Sleep remaining time if needed
-		if remaining > 0:
-			await asyncio.sleep(remaining)
-
+			
+			# Wait for network idle (approximation)
+			await asyncio.sleep(self.config.wait_for_network_idle_page_load_time)
+			
+		except TimeoutException:
+			logger.warning(f"Page load timed out after {timeout} seconds")
+		
+		return
+	
 	def _is_url_allowed(self, url: str) -> bool:
-		"""Check if a URL is allowed based on the whitelist configuration."""
+		"""Check if the URL is allowed based on the allowed_domains configuration"""
 		if not self.config.allowed_domains:
 			return True
-
+			
 		try:
 			from urllib.parse import urlparse
-
-			parsed_url = urlparse(url)
-			domain = parsed_url.netloc.lower()
-
-			# Remove port number if present
-			if ':' in domain:
-				domain = domain.split(':')[0]
-
-			# Check if domain matches any allowed domain pattern
-			return any(
-				domain == allowed_domain.lower() or domain.endswith('.' + allowed_domain.lower())
-				for allowed_domain in self.config.allowed_domains
-			)
-		except Exception as e:
-			logger.error(f'Error checking URL allowlist: {str(e)}')
+			hostname = urlparse(url).hostname
+			
+			if not hostname:
+				return True
+				
+			for domain in self.config.allowed_domains:
+				if hostname == domain or hostname.endswith(f".{domain}"):
+					return True
+					
 			return False
-
-	async def _check_and_handle_navigation(self, page: Page) -> None:
-		"""Check if current page URL is allowed and handle if not."""
-		if not self._is_url_allowed(page.url):
-			logger.warning(f'Navigation to non-allowed URL detected: {page.url}')
-			try:
-				await self.go_back()
-			except Exception as e:
-				logger.error(f'Failed to go back after detecting non-allowed URL: {str(e)}')
-			raise URLNotAllowedError(f'Navigation to non-allowed URL: {page.url}')
+		except Exception as e:
+			logger.error(f"Error checking allowed URL: {e}")
+			return True
+	
+	async def _check_and_handle_navigation(self) -> None:
+		"""Check if the current URL is allowed and handle navigation if needed"""
+		driver = await self.get_current_driver()
+		current_url = driver.current_url
+		
+		if not self._is_url_allowed(current_url):
+			logger.warning(f"Navigation to disallowed URL: {current_url}")
+			raise URLNotAllowedError(f"Navigation to URL '{current_url}' is not allowed.")
 
 	async def navigate_to(self, url: str):
 		"""Navigate to a URL"""
 		if not self._is_url_allowed(url):
-			raise BrowserError(f'Navigation to non-allowed URL: {url}')
-
-		page = await self.get_current_page()
-		await page.goto(url)
-		await page.wait_for_load_state()
+			raise URLNotAllowedError(f"Navigation to URL '{url}' is not allowed.")
+			
+		driver = await self.get_current_driver()
+		driver.get(url)
+		await self._wait_for_page_load()
+		await self._check_and_handle_navigation()
 
 	async def refresh_page(self):
 		"""Refresh the current page"""
-		page = await self.get_current_page()
-		await page.reload()
-		await page.wait_for_load_state()
+		driver = await self.get_current_driver()
+		driver.refresh()
+		await self._wait_for_page_load()
+		await self._check_and_handle_navigation()
 
 	async def go_back(self):
-		"""Navigate back in history"""
-		page = await self.get_current_page()
-		try:
-			# 10 ms timeout
-			await page.go_back(timeout=10, wait_until='domcontentloaded')
-			# await self._wait_for_page_and_frames_load(timeout_overwrite=1.0)
-		except Exception as e:
-			# Continue even if its not fully loaded, because we wait later for the page to load
-			logger.debug(f'During go_back: {e}')
+		"""Go back to the previous page"""
+		driver = await self.get_current_driver()
+		driver.back()
+		await self._wait_for_page_load()
+		await self._check_and_handle_navigation()
 
 	async def go_forward(self):
-		"""Navigate forward in history"""
-		page = await self.get_current_page()
-		try:
-			await page.go_forward(timeout=10, wait_until='domcontentloaded')
-		except Exception as e:
-			# Continue even if its not fully loaded, because we wait later for the page to load
-			logger.debug(f'During go_forward: {e}')
+		"""Go forward to the next page"""
+		driver = await self.get_current_driver()
+		driver.forward()
+		await self._wait_for_page_load() 
+		await self._check_and_handle_navigation()
 
 	async def close_current_tab(self):
 		"""Close the current tab"""
-		session = await self.get_session()
-		page = session.current_page
-		await page.close()
-
-		# Switch to the first available tab if any exist
-		if session.context.pages:
-			await self.switch_to_tab(0)
-
-		# otherwise the browser will be closed
+		driver = await self.get_current_driver()
+		
+		# Don't close if it's the last tab
+		if len(driver.window_handles) <= 1:
+			logger.warning("Cannot close the last tab")
+			return
+			
+		# Close current window and switch to first available
+		driver.close()
+		driver.switch_to.window(driver.window_handles[0])
+		await self._wait_for_page_load()
 
 	async def get_page_html(self) -> str:
-		"""Get the current page HTML content"""
-		page = await self.get_current_page()
-		return await page.content()
+		"""Get the HTML of the current page"""
+		driver = await self.get_current_driver()
+		return driver.page_source
 
-	async def execute_javascript(self, script: str):
-		"""Execute JavaScript code on the page"""
-		page = await self.get_current_page()
-		return await page.evaluate(script)
+	async def execute_javascript(self, script: str, *args):
+		"""Execute JavaScript in the browser"""
+		driver = await self.get_current_driver()
+		return driver.execute_script(script, *args)
 
-	@time_execution_sync('--get_state')  # This decorator might need to be updated to handle async
+	@time_execution_sync('--get_state')
 	async def get_state(self) -> BrowserState:
-		"""Get the current state of the browser"""
-		await self._wait_for_page_and_frames_load()
+		"""Get the browser state"""
 		session = await self.get_session()
-		session.cached_state = await self._update_state()
-
-		# Save cookies if a file is specified
-		if self.config.cookies_file:
-			asyncio.create_task(self.save_cookies())
-
-		return session.cached_state
+		if session.cached_state:
+			return session.cached_state
+		else:
+			return await self._update_state()
 
 	async def _update_state(self, focus_element: int = -1) -> BrowserState:
-		"""Update and return state."""
+		"""Update the browser state"""
 		session = await self.get_session()
-
-		# Check if current page is still valid, if not switch to another available page
+		driver = session.driver
+		
+		# Wait for page to stabilize
+		await self._wait_for_page_load()
+		
 		try:
-			page = await self.get_current_page()
-			# Test if page is still accessible
-			await page.evaluate('1')
-		except Exception as e:
-			logger.debug(f'Current page is no longer accessible: {str(e)}')
-			# Get all available pages
-			pages = session.context.pages
-			if pages:
-				session.current_page = pages[-1]
-				page = session.current_page
-				logger.debug(f'Switched to page: {await page.title()}')
-			else:
-				raise BrowserError('Browser closed: no valid pages available')
-
-		try:
-			await self.remove_highlights()
-			dom_service = DomService(page)
-			content = await dom_service.get_clickable_elements(
-				focus_element=focus_element,
-				viewport_expansion=self.config.viewport_expansion,
-				highlight_elements=self.config.highlight_elements,
+			# Get the DOM tree
+			dom_tree = await self.dom_service.extract_dom_tree(
+				self,
+				viewport_expansion=self.config.viewport_expansion
 			)
-
-			screenshot_b64 = await self.take_screenshot()
-			pixels_above, pixels_below = await self.get_scroll_info(page)
-
-			self.current_state = BrowserState(
-				element_tree=content.element_tree,
-				selector_map=content.selector_map,
-				url=page.url,
-				title=await page.title(),
-				tabs=await self.get_tabs_info(),
-				screenshot=screenshot_b64,
-				pixels_above=pixels_above,
-				pixels_below=pixels_below,
+			
+			# Get active tab info
+			tabs = await self.get_tabs_info()
+			
+			# Get current window handle to track active tab
+			current_handle = driver.current_window_handle
+			
+			# Generate selector map
+			selector_map = await self.get_selector_map()
+			
+			# Highlight elements if configured
+			if self.config.highlight_elements and dom_tree and focus_element >= 0:
+				# Find the element to highlight
+				element_to_highlight = None
+				if focus_element in selector_map:
+					element_to_highlight = selector_map[focus_element]
+				
+				if element_to_highlight:
+					# Highlight in DOM with JavaScript
+					js_highlight = """
+					function highlightElement(element) {
+						var originalBackground = element.style.backgroundColor;
+						var originalBorder = element.style.border;
+						element.style.backgroundColor = 'rgba(255, 165, 0, 0.3)';
+						element.style.border = '2px solid orange';
+						setTimeout(function() {
+							element.style.backgroundColor = originalBackground;
+							element.style.border = originalBorder;
+						}, 3000);
+					}
+					return highlightElement(arguments[0]);
+					"""
+					
+					try:
+						web_element = await self.get_element_by_index(focus_element)
+						if web_element:
+							driver.execute_script(js_highlight, web_element)
+					except Exception as e:
+						logger.debug(f"Failed to highlight element: {e}")
+			
+			# Take screenshot if configured
+			screenshot = None
+			try:
+				screenshot = await self.take_screenshot()
+			except Exception as e:
+				logger.error(f"Failed to take screenshot: {e}")
+			
+			# Create and cache the browser state
+			state = BrowserState(
+				element_tree=dom_tree,
+				selector_map=selector_map,
+				url=driver.current_url,
+				title=driver.title,
+				screenshot=screenshot,
+				tabs=tabs
 			)
-
-			return self.current_state
+			session.cached_state = state
+			return state
+		
 		except Exception as e:
-			logger.error(f'Failed to update state: {str(e)}')
-			# Return last known good state if available
-			if hasattr(self, 'current_state'):
-				return self.current_state
-			raise
-
-	# region - Browser Actions
+			logger.error(f"Error updating browser state: {e}")
+			logger.error(traceback.format_exc())
+			
+			# Return a minimal state in case of error
+			return BrowserState(
+				element_tree=DOMElementNode(
+					tag_name='root',
+					is_visible=True,
+					parent=None,
+					xpath='',
+					attributes={},
+					children=[],
+				),
+				selector_map={},
+				url=driver.current_url if driver else "",
+				title=driver.title if driver else "",
+				screenshot=None,
+				tabs=[]
+			)
 
 	async def take_screenshot(self, full_page: bool = False) -> str:
 		"""
 		Returns a base64 encoded screenshot of the current page.
 		"""
-		page = await self.get_current_page()
-
-		screenshot = await page.screenshot(
-			full_page=full_page,
-			animations='disabled',
-		)
-
-		screenshot_b64 = base64.b64encode(screenshot).decode('utf-8')
-
-		# await self.remove_highlights()
-
-		return screenshot_b64
+		driver = await self.get_current_driver()
+		
+		# For full page screenshot, we need to use a different approach
+		if full_page:
+			# Scroll to capture full page (simplified implementation)
+			total_height = driver.execute_script("return document.body.scrollHeight")
+			viewport_height = driver.execute_script("return window.innerHeight")
+			
+			# Create a canvas the size of the page
+			create_canvas = """
+			var canvas = document.createElement('canvas');
+			canvas.width = window.innerWidth;
+			canvas.height = arguments[0];
+			canvas.style.position = 'absolute';
+			canvas.style.top = '0';
+			canvas.style.left = '0';
+			canvas.style.zIndex = '-1';
+			document.body.appendChild(canvas);
+			return canvas;
+			"""
+			canvas = driver.execute_script(create_canvas, total_height)
+			
+			# Scroll through page and capture each part
+			original_scroll = driver.execute_script("return window.scrollY")
+			for y_pos in range(0, total_height, viewport_height):
+				driver.execute_script(f"window.scrollTo(0, {y_pos})")
+				await asyncio.sleep(0.1)  # Wait for rendering
+				
+				# Draw the current viewport to canvas at the right position
+				draw_to_canvas = """
+				var ctx = arguments[0].getContext('2d');
+				var img = new Image();
+				img.src = arguments[1];
+				ctx.drawImage(img, 0, arguments[2], window.innerWidth, window.innerHeight);
+				"""
+				# Take screenshot of current viewport
+				viewport_screenshot = driver.get_screenshot_as_base64()
+				driver.execute_script(
+					draw_to_canvas,
+					canvas,
+					f"data:image/png;base64,{viewport_screenshot}",
+					y_pos
+				)
+			
+			# Return to original scroll position
+			driver.execute_script(f"window.scrollTo(0, {original_scroll})")
+			
+			# Get the final full screenshot from canvas
+			get_canvas_image = "return arguments[0].toDataURL('image/png').split(',')[1];"
+			full_screenshot = driver.execute_script(get_canvas_image, canvas)
+			
+			# Clean up
+			driver.execute_script("arguments[0].remove()", canvas)
+			
+			return full_screenshot
+		else:
+			# Regular viewport screenshot
+			screenshot = driver.get_screenshot_as_base64()
+			return screenshot
 
 	async def remove_highlights(self):
 		"""
 		Removes all highlight overlays and labels created by the highlightElement function.
-		Handles cases where the page might be closed or inaccessible.
 		"""
 		try:
-			page = await self.get_current_page()
-			await page.evaluate(
-				"""
-                try {
-                    // Remove the highlight container and all its contents
-                    const container = document.getElementById('playwright-highlight-container');
-                    if (container) {
-                        container.remove();
-                    }
-
-                    // Remove highlight attributes from elements
-                    const highlightedElements = document.querySelectorAll('[browser-user-highlight-id^="playwright-highlight-"]');
-                    highlightedElements.forEach(el => {
-                        el.removeAttribute('browser-user-highlight-id');
-                    });
-                } catch (e) {
-                    console.error('Failed to remove highlights:', e);
-                }
-                """
-			)
+			driver = await self.get_current_driver()
+			driver.execute_script("""
+			try {
+				// Remove highlight styles
+				document.querySelectorAll('[browser-user-highlight-id]').forEach(el => {
+					el.style.backgroundColor = '';
+					el.style.border = '';
+					el.removeAttribute('browser-user-highlight-id');
+				});
+			} catch (e) {
+				console.error('Failed to remove highlights:', e);
+			}
+			""")
 		except Exception as e:
 			logger.debug(f'Failed to remove highlights (this is usually ok): {str(e)}')
 			# Don't raise the error since this is not critical functionality
-			pass
-
-	# endregion
-
-	# region - User Actions
 
 	@classmethod
-	def _convert_simple_xpath_to_css_selector(cls, xpath: str) -> str:
-		"""Converts simple XPath expressions to CSS selectors."""
-		if not xpath:
-			return ''
-
-		# Remove leading slash if present
-		xpath = xpath.lstrip('/')
-
-		# Split into parts
+	def _convert_xpath_to_css_selector(cls, xpath: str) -> str:
+		"""
+		Convert a simple XPath to CSS selector when possible.
+		For complex XPaths, returns an empty string.
+		"""
+		# This is a simplified conversion - only handles basic cases
+		if not xpath or not xpath.startswith('//'):
+			return ""
+			
+		# Remove leading //
+		xpath = xpath[2:]
+		
+		# Split the xpath parts
 		parts = xpath.split('/')
 		css_parts = []
-
+		
 		for part in parts:
 			if not part:
 				continue
-
-			# Handle index notation [n]
+				
+			# Check for predicates
 			if '[' in part:
-				base_part = part[: part.find('[')]
-				index_part = part[part.find('[') :]
-
-				# Handle multiple indices
-				indices = [i.strip('[]') for i in index_part.split(']')[:-1]]
-
-				for idx in indices:
-					try:
-						# Handle numeric indices
-						if idx.isdigit():
-							index = int(idx) - 1
-							base_part += f':nth-of-type({index + 1})'
-						# Handle last() function
-						elif idx == 'last()':
-							base_part += ':last-of-type'
-						# Handle position() functions
-						elif 'position()' in idx:
-							if '>1' in idx:
-								base_part += ':nth-of-type(n+2)'
-					except ValueError:
-						continue
-
-				css_parts.append(base_part)
+				tag_name, predicate = part.split('[', 1)
+				predicate = predicate.rstrip(']')
+				
+				# Handle position predicates
+				if predicate.isdigit() or predicate.startswith('position()='):
+					pos = predicate if predicate.isdigit() else predicate.split('=')[1]
+					css_parts.append(f"{tag_name}:nth-of-type({pos})")
+				# Handle attribute predicates
+				elif '@' in predicate:
+					attr = predicate.replace('@', '')
+					if '=' in attr:
+						attr_name, attr_value = attr.split('=', 1)
+						# Remove quotes from attribute value
+						attr_value = attr_value.strip('"\'')
+						css_parts.append(f"{tag_name}[{attr_name}='{attr_value}']")
+					else:
+						css_parts.append(f"{tag_name}[{attr}]")
+				else:
+					# Can't handle complex predicates
+					return ""
 			else:
 				css_parts.append(part)
-
-		base_selector = ' > '.join(css_parts)
-		return base_selector
+				
+		return ' > '.join(css_parts)
 
 	@classmethod
 	def _enhanced_css_selector_for_element(cls, element: DOMElementNode, include_dynamic_attributes: bool = True) -> str:
 		"""
-		Creates a CSS selector for a DOM element, handling various edge cases and special characters.
-
-		Args:
-		        element: The DOM element to create a selector for
-
-		Returns:
-		        A valid CSS selector string
+		Creates a more specific CSS selector for an element using attributes.
 		"""
+		if not element:
+			return ""
+			
+		tag_name = element.tag_name.lower()
+		if tag_name == "#text" or tag_name == "#comment":
+			return ""
+			
+		# Start with the tag name
+		selector = tag_name
+		
+		# Add id if available (most specific)
+		if element.attributes.get('id'):
+			id_value = element.attributes['id']
+			# Clean the id value of any special characters
+			clean_id = re.sub(r'[:"\'`.()\[\]\/\\]', '\\\\$&', id_value)
+			return f"{selector}#'{clean_id}'"
+			
+		# Add useful identifying attributes
+		attr_selectors = []
+		
+		# Add static identifying attributes
+		priority_attrs = ['name', 'type', 'role', 'aria-label', 'title', 'href', 'placeholder']
+		for attr in priority_attrs:
+			if attr in element.attributes and element.attributes[attr]:
+				value = element.attributes[attr]
+				value = re.sub(r'[:"\'`.()\[\]\/\\]', '\\\\$&', value)
+				attr_selectors.append(f"[{attr}='{value}']")
+				
+		# Include dynamic attributes if requested
+		if include_dynamic_attributes:
+			# Add data attributes
+			for attr, value in element.attributes.items():
+				if attr.startswith('data-') and value:
+					value = re.sub(r'[:"\'`.()\[\]\/\\]', '\\\\$&', value)
+					attr_selectors.append(f"[{attr}='{value}']")
+		
+		# Add classes selectively (not all, as they can change)
+		if 'class' in element.attributes and element.attributes['class']:
+			classes = element.attributes['class'].split()
+			stable_classes = [c for c in classes if not c.startswith('js-') and len(c) > 2]
+			if stable_classes:
+				# Take up to 2 classes to avoid over-specification
+				for cls in stable_classes[:2]:
+					cls = re.sub(r'[:"\'`.()\[\]\/\\]', '\\\\$&', cls)
+					attr_selectors.append(f".{cls}")
+					
+		# Combine tag with attribute selectors
+		if attr_selectors:
+			selector += ''.join(attr_selectors)
+			
+		return selector
+
+	async def get_locate_element(self, element: DOMElementNode) -> Optional[WebElement]:
+		"""
+		Locate an element in the current page based on the DOM element node.
+		"""
+		driver = await self.get_current_driver()
+		
+		if not element:
+			return None
+			
+		# Try different locator strategies in order of reliability
 		try:
-			# Get base selector from XPath
-			css_selector = cls._convert_simple_xpath_to_css_selector(element.xpath)
-
-			# Handle class attributes
-			if 'class' in element.attributes and element.attributes['class'] and include_dynamic_attributes:
-				# Define a regex pattern for valid class names in CSS
-				valid_class_name_pattern = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_-]*$')
-
-				# Iterate through the class attribute values
-				classes = element.attributes['class'].split()
-				for class_name in classes:
-					# Skip empty class names
-					if not class_name.strip():
-						continue
-
-					# Check if the class name is valid
-					if valid_class_name_pattern.match(class_name):
-						# Append the valid class name to the CSS selector
-						css_selector += f'.{class_name}'
-					else:
-						# Skip invalid class names
-						continue
-
-			# Expanded set of safe attributes that are stable and useful for selection
-			SAFE_ATTRIBUTES = {
-				# Data attributes (if they're stable in your application)
-				'id',
-				# Standard HTML attributes
-				'name',
-				'type',
-				'placeholder',
-				# Accessibility attributes
-				'aria-label',
-				'aria-labelledby',
-				'aria-describedby',
-				'role',
-				# Common form attributes
-				'for',
-				'autocomplete',
-				'required',
-				'readonly',
-				# Media attributes
-				'alt',
-				'title',
-				'src',
-				# Custom stable attributes (add any application-specific ones)
-				'href',
-				'target',
-			}
-
-			if include_dynamic_attributes:
-				dynamic_attributes = {
-					'data-id',
-					'data-qa',
-					'data-cy',
-					'data-testid',
-				}
-				SAFE_ATTRIBUTES.update(dynamic_attributes)
-
-			# Handle other attributes
-			for attribute, value in element.attributes.items():
-				if attribute == 'class':
-					continue
-
-				# Skip invalid attribute names
-				if not attribute.strip():
-					continue
-
-				if attribute not in SAFE_ATTRIBUTES:
-					continue
-
-				# Escape special characters in attribute names
-				safe_attribute = attribute.replace(':', r'\:')
-
-				# Handle different value cases
-				if value == '':
-					css_selector += f'[{safe_attribute}]'
-				elif any(char in value for char in '"\'<>`\n\r\t'):
-					# Use contains for values with special characters
-					# Regex-substitute *any* whitespace with a single space, then strip.
-					collapsed_value = re.sub(r'\s+', ' ', value).strip()
-					# Escape embedded double-quotes.
-					safe_value = collapsed_value.replace('"', '\\"')
-					css_selector += f'[{safe_attribute}*="{safe_value}"]'
-				else:
-					css_selector += f'[{safe_attribute}="{value}"]'
-
-			return css_selector
-
-		except Exception:
-			# Fallback to a more basic selector if something goes wrong
-			tag_name = element.tag_name or '*'
-			return f"{tag_name}[highlight_index='{element.highlight_index}']"
-
-	async def get_locate_element(self, element: DOMElementNode) -> Optional[ElementHandle]:
-		current_frame = await self.get_current_page()
-
-		# Start with the target element and collect all parents
-		parents: list[DOMElementNode] = []
-		current = element
-		while current.parent is not None:
-			parent = current.parent
-			parents.append(parent)
-			current = parent
-
-		# Reverse the parents list to process from top to bottom
-		parents.reverse()
-
-		# Process all iframe parents in sequence
-		iframes = [item for item in parents if item.tag_name == 'iframe']
-		for parent in iframes:
+			# 1. Try locating by XPath
+			if element.xpath:
+				try:
+					return driver.find_element(By.XPATH, element.xpath)
+				except (NoSuchElementException, WebDriverException):
+					pass
+					
+			# 2. Try CSS selector derived from the element
 			css_selector = self._enhanced_css_selector_for_element(
-				parent, include_dynamic_attributes=self.config.include_dynamic_attributes
+				element, 
+				include_dynamic_attributes=self.config.include_dynamic_attributes
 			)
-			current_frame = current_frame.frame_locator(css_selector)
-
-		css_selector = self._enhanced_css_selector_for_element(
-			element, include_dynamic_attributes=self.config.include_dynamic_attributes
-		)
-
-		try:
-			if isinstance(current_frame, FrameLocator):
-				element_handle = await current_frame.locator(css_selector).element_handle()
-				return element_handle
-			else:
-				# Try to scroll into view if hidden
-				element_handle = await current_frame.query_selector(css_selector)
-				if element_handle:
-					await element_handle.scroll_into_view_if_needed()
-					return element_handle
-				return None
+			if css_selector:
+				try:
+					return driver.find_element(By.CSS_SELECTOR, css_selector)
+				except (NoSuchElementException, WebDriverException):
+					pass
+					
+			# 3. Try simpler CSS selector based on tag and id/class
+			simple_selector = ""
+			if element.tag_name and element.tag_name != "#text":
+				simple_selector = element.tag_name.lower()
+				
+				if 'id' in element.attributes and element.attributes['id']:
+					simple_selector += f"#{element.attributes['id']}"
+				elif 'class' in element.attributes and element.attributes['class']:
+					classes = element.attributes['class'].split()
+					if classes:
+						simple_selector += f".{classes[0]}"
+						
+			if simple_selector:
+				try:
+					return driver.find_element(By.CSS_SELECTOR, simple_selector)
+				except (NoSuchElementException, WebDriverException):
+					pass
+					
+			# 4. Try to find by text content
+			if isinstance(element, DOMElementNode):
+				element_text = ""
+				# Get text from child text nodes
+				for child in element.children:
+					if isinstance(child, DOMTextNode):
+						element_text += child.text
+				
+				if element_text and element_text.strip():
+					try:
+						return driver.find_element(By.XPATH, f"//*[contains(text(), '{element_text}')]")
+					except (NoSuchElementException, WebDriverException):
+						pass
+					
+			# Failed to locate element
+			return None
+			
 		except Exception as e:
-			logger.error(f'Failed to locate element: {str(e)}')
+			logger.error(f"Error locating element: {e}")
 			return None
 
 	async def _input_text_element_node(self, element_node: DOMElementNode, text: str):
+		"""Input text into an element"""
+		driver = await self.get_current_driver()
+		element = await self.get_locate_element(element_node)
+		
+		if not element:
+			raise Exception(f"Could not locate element from node: {element_node.tag_name}")
+			
 		try:
-			# Highlight before typing
-			if element_node.highlight_index is not None:
-				await self._update_state(focus_element=element_node.highlight_index)
-
-			page = await self.get_current_page()
-			element_handle = await self.get_locate_element(element_node)
-
-			if element_handle is None:
-				raise Exception(f'Element: {repr(element_node)} not found')
-
-			await element_handle.scroll_into_view_if_needed(timeout=2500)
-			await element_handle.fill('')
-			await element_handle.type(text)
-			await page.wait_for_load_state()
-
+			# Clear existing text
+			element.clear()
+			
+			# Send the new text
+			element.send_keys(text)
+			
+			# Wait a bit for the page to process the input
+			await asyncio.sleep(0.3)
+			
+			return True
 		except Exception as e:
-			raise Exception(f'Failed to input text into element: {repr(element_node)}. Error: {str(e)}')
+			logger.error(f"Error inputting text: {e}")
+			raise
 
 	async def _click_element_node(self, element_node: DOMElementNode) -> Optional[str]:
-		"""
-		Optimized method to click an element using xpath.
-		"""
-		page = await self.get_current_page()
-
-		try:
-			# Highlight before clicking
-			if element_node.highlight_index is not None:
-				await self._update_state(focus_element=element_node.highlight_index)
-
-			element_handle = await self.get_locate_element(element_node)
-
-			if element_handle is None:
-				raise Exception(f'Element: {repr(element_node)} not found')
-
-			async def perform_click(click_func):
-				"""Performs the actual click, handling both download
-				and navigation scenarios."""
-				if self.config.save_downloads_path:
-					try:
-						# Try short-timeout expect_download to detect a file download has been been triggered
-						async with page.expect_download(timeout=5000) as download_info:
-							await click_func()
-						download = await download_info.value
-						# If the download succeeds, save to disk
-						download_path = os.path.join(self.config.save_downloads_path, download.suggested_filename)
-						await download.save_as(download_path)
-						logger.debug(f'Download triggered. Saved file to: {download_path}')
-						return download_path
-					except TimeoutError:
-						# If no download is triggered, treat as normal click
-						logger.debug('No download triggered within timeout. Checking navigation...')
-						await page.wait_for_load_state()
-						await self._check_and_handle_navigation(page)
-				else:
-					# Standard click logic if no download is expected
-					await click_func()
-					await page.wait_for_load_state()
-					await self._check_and_handle_navigation(page)
-
+		"""Click an element on the page"""
+		driver = await self.get_current_driver()
+		element = await self.get_locate_element(element_node)
+		
+		if not element:
+			raise Exception(f"Could not locate element from node {element_node.tag_name}")
+			
+		# Store original window handles to detect new windows
+		original_handles = driver.window_handles
+		
+		# Check if element could trigger file upload dialog
+		is_file_uploader = await self.is_file_uploader(element_node)
+		if is_file_uploader:
+			raise Exception("Element appears to be a file uploader. Use a file upload action instead.")
+			
+		# Try different click methods
+		async def try_click_methods():
+			# Store the number of windows before clicking
+			window_count_before = len(driver.window_handles)
+			download_path = None
+			
 			try:
-				return await perform_click(lambda: element_handle.click(timeout=1500))
-			except URLNotAllowedError as e:
-				raise e
-			except Exception:
+				# Method 1: Standard click
 				try:
-					return await perform_click(lambda: page.evaluate('(el) => el.click()', element_handle))
-				except URLNotAllowedError as e:
-					raise e
-				except Exception as e:
-					raise Exception(f'Failed to click element: {str(e)}')
+					element.click()
+					await asyncio.sleep(0.5)  # Wait for potential navigation
+					return True
+				except Exception as e1:
+					logger.debug(f"Standard click failed: {e1}")
+				
+				# Method 2: JavaScript click
+				try:
+					driver.execute_script("arguments[0].click();", element)
+					await asyncio.sleep(0.5)
+					return True
+				except Exception as e2:
+					logger.debug(f"JavaScript click failed: {e2}")
+				
+				# Method 3: ActionChains click
+				try:
+					actions = ActionChains(driver)
+					actions.move_to_element(element).click().perform()
+					await asyncio.sleep(0.5)
+					return True
+				except Exception as e3:
+					logger.debug(f"ActionChains click failed: {e3}")
+				
+				# Method 4: Click with coordinates (center of element)
+				try:
+					actions = ActionChains(driver)
+					actions.move_to_element_with_offset(
+						element, 
+						element.size['width']//2, 
+						element.size['height']//2
+					).click().perform()
+					await asyncio.sleep(0.5)
+					return True
+				except Exception as e4:
+					logger.debug(f"Coordinate click failed: {e4}")
+				
+				# If all methods failed
+				return False
+			
+			finally:
+				# Check if a new window was opened
+				window_count_after = len(driver.window_handles)
+				if window_count_after > window_count_before:
+					# Switch to the new window
+					new_handle = [h for h in driver.window_handles if h not in original_handles][0]
+					driver.switch_to.window(new_handle)
+					await self._wait_for_page_load()
+			
+			return download_path
+			
+		success = await try_click_methods()
+		if not success:
+			raise Exception(f"Failed to click element with all methods")
+			
+		# Check for downloads
+		download_path = None
+		if self.config.save_downloads_path:
+			# Wait briefly to see if a download started
+			await asyncio.sleep(1)
+			# Check downloads folder for new files
+			# This would need more implementation
+		
+		# Wait for any navigation or DOM changes to complete
+		await self._wait_for_page_load()
+		
+		return download_path
 
-		except URLNotAllowedError as e:
-			raise e
-		except Exception as e:
-			raise Exception(f'Failed to click element: {repr(element_node)}. Error: {str(e)}')
+	async def get_tabs_info(self) -> List[TabInfo]:
+		"""Get information about all open tabs"""
+		driver = await self.get_current_driver()
+		tabs = []
+		
+		current_handle = driver.current_window_handle
+		
+		for i, handle in enumerate(driver.window_handles):
+			try:
+				# Switch to this window/tab
+				driver.switch_to.window(handle)
+				
+				# Store if this is the active tab
+				is_active = (handle == current_handle)
+				
+				# Get tab info
+				tab_info = TabInfo(
+					page_id=i,
+					title=driver.title or f"Tab {i+1}",
+					url=driver.current_url
+				)
+				tabs.append(tab_info)
+				
+				# Add debug log for tracking active tab
+				if is_active:
+					logger.debug(f"Active tab: {tab_info.title} (ID: {tab_info.page_id})")
+					
+			except Exception as e:
+				logger.error(f"Error getting tab info: {e}")
+				tabs.append(TabInfo(
+					page_id=i,
+					title=f"Tab {i+1}",
+					url=""
+				))
+				
+		# Switch back to original tab
+		driver.switch_to.window(current_handle)
+		
+		return tabs
 
-	async def get_tabs_info(self) -> list[TabInfo]:
-		"""Get information about all tabs"""
-		session = await self.get_session()
+	async def switch_to_tab(self, tab_id: int) -> None:
+		"""Switch to a specific tab"""
+		driver = await self.get_current_driver()
+		
+		if tab_id < 0:
+			# Handle negative indexing (e.g., -1 for last tab)
+			handles = driver.window_handles
+			tab_id = len(handles) + tab_id
+			
+		if 0 <= tab_id < len(driver.window_handles):
+			driver.switch_to.window(driver.window_handles[tab_id])
+			await self._wait_for_page_load()
+		else:
+			raise ValueError(f"Tab ID {tab_id} is out of range")
 
-		tabs_info = []
-		for page_id, page in enumerate(session.context.pages):
-			tab_info = TabInfo(page_id=page_id, url=page.url, title=await page.title())
-			tabs_info.append(tab_info)
-
-		return tabs_info
-
-	async def switch_to_tab(self, page_id: int) -> None:
-		"""Switch to a specific tab by its page_id
-
-		@You can also use negative indices to switch to tabs from the end (Pure pythonic way)
-		"""
-		session = await self.get_session()
-		pages = session.context.pages
-
-		if page_id >= len(pages):
-			raise BrowserError(f'No tab found with page_id: {page_id}')
-
-		page = pages[page_id]
-
-		# Check if the tab's URL is allowed before switching
-		if not self._is_url_allowed(page.url):
-			raise BrowserError(f'Cannot switch to tab with non-allowed URL: {page.url}')
-
-		session.current_page = page
-
-		await page.bring_to_front()
-		await page.wait_for_load_state()
-
-	async def create_new_tab(self, url: str | None = None) -> None:
+	async def create_new_tab(self, url: Optional[str] = None) -> None:
 		"""Create a new tab and optionally navigate to a URL"""
-		if url and not self._is_url_allowed(url):
-			raise BrowserError(f'Cannot create new tab with non-allowed URL: {url}')
-
-		session = await self.get_session()
-		new_page = await session.context.new_page()
-		session.current_page = new_page
-
-		await new_page.wait_for_load_state()
-
-		page = await self.get_current_page()
-
+		driver = await self.get_current_driver()
+		
+		# Open a new tab
+		driver.execute_script("window.open('about:blank');")
+		
+		# Switch to the new tab (last in the list)
+		await self.switch_to_tab(-1)
+		
+		# Navigate to URL if provided
 		if url:
-			await page.goto(url)
-			await self._wait_for_page_and_frames_load(timeout_overwrite=1)
+			await self.navigate_to(url)
 
-	# endregion
-
-	# region - Helper methods for easier access to the DOM
 	async def get_selector_map(self) -> SelectorMap:
+		"""Get the selector map from the DOM service"""
+		return await self.dom_service.get_selector_map(self)
+
+	async def get_element_by_index(self, index: int) -> Optional[WebElement]:
+		"""Get a WebElement by its index in the selector map"""
 		session = await self.get_session()
-		return session.cached_state.selector_map
+		
+		if index not in session.cached_state.selector_map:
+			return None
+			
+		element_node = session.cached_state.selector_map[index]
+		return await self.get_locate_element(element_node)
 
-	async def get_element_by_index(self, index: int) -> ElementHandle | None:
-		selector_map = await self.get_selector_map()
-		element_handle = await self.get_locate_element(selector_map[index])
-		return element_handle
-
-	async def get_dom_element_by_index(self, index: int) -> DOMElementNode | None:
-		selector_map = await self.get_selector_map()
-		return selector_map[index]
+	async def get_dom_element_by_index(self, index: int) -> Optional[DOMElementNode]:
+		"""Get a DOM element node by its index in the selector map"""
+		session = await self.get_session()
+		
+		if index not in session.cached_state.selector_map:
+			return None
+			
+		return session.cached_state.selector_map[index]
 
 	async def save_cookies(self):
-		"""Save current cookies to file"""
-		if self.session and self.session.context and self.config.cookies_file:
-			try:
-				cookies = await self.session.context.cookies()
-				logger.info(f'Saving {len(cookies)} cookies to {self.config.cookies_file}')
-
-				# Check if the path is a directory and create it if necessary
-				dirname = os.path.dirname(self.config.cookies_file)
-				if dirname:
-					os.makedirs(dirname, exist_ok=True)
-
-				with open(self.config.cookies_file, 'w') as f:
-					json.dump(cookies, f)
-			except Exception as e:
-				logger.warning(f'Failed to save cookies: {str(e)}')
+		"""Save cookies to a file if configured"""
+		if not self.config.cookies_file:
+			return
+			
+		try:
+			driver = await self.get_current_driver()
+			cookies = driver.get_cookies()
+			
+			# Create directory if it doesn't exist
+			cookie_dir = os.path.dirname(self.config.cookies_file)
+			if cookie_dir and not os.path.exists(cookie_dir):
+				os.makedirs(cookie_dir)
+				
+			with open(self.config.cookies_file, 'w') as f:
+				json.dump(cookies, f)
+				
+			logger.info(f'Saved {len(cookies)} cookies to {self.config.cookies_file}')
+		except Exception as e:
+			logger.error(f'Failed to save cookies: {e}')
 
 	async def is_file_uploader(self, element_node: DOMElementNode, max_depth: int = 3, current_depth: int = 0) -> bool:
-		"""Check if element or its children are file uploaders"""
+		"""Check if an element is a file uploader or contains one"""
+		# Base case: max recursion depth
 		if current_depth > max_depth:
 			return False
-
-		# Check current element
-		is_uploader = False
-
-		if not isinstance(element_node, DOMElementNode):
-			return False
-
-		# Check for file input attributes
-		if element_node.tag_name == 'input':
-			is_uploader = element_node.attributes.get('type') == 'file' or element_node.attributes.get('accept') is not None
-
-		if is_uploader:
+			
+		# Check if element is an input with type="file"
+		if (element_node.tag_name.lower() == 'input' and 
+			element_node.attributes.get('type', '').lower() == 'file'):
 			return True
-
-		# Recursively check children
-		if element_node.children and current_depth < max_depth:
-			for child in element_node.children:
-				if isinstance(child, DOMElementNode):
-					if await self.is_file_uploader(child, max_depth, current_depth + 1):
-						return True
-
+			
+		# Check if element has an input[type="file"] descendant
+		for child in element_node.children:
+			if isinstance(child, DOMElementNode) and await self.is_file_uploader(child, max_depth, current_depth + 1):
+				return True
+				
 		return False
 
-	async def get_scroll_info(self, page: Page) -> tuple[int, int]:
-		"""Get scroll position information for the current page."""
-		scroll_y = await page.evaluate('window.scrollY')
-		viewport_height = await page.evaluate('window.innerHeight')
-		total_height = await page.evaluate('document.documentElement.scrollHeight')
+	async def get_scroll_info(self) -> Tuple[int, int]:
+		"""Get scroll position information for the current page"""
+		driver = await self.get_current_driver()
+		
+		scroll_y = driver.execute_script('return window.scrollY;')
+		viewport_height = driver.execute_script('return window.innerHeight;')
+		total_height = driver.execute_script('return document.documentElement.scrollHeight;')
+		
 		pixels_above = scroll_y
 		pixels_below = total_height - (scroll_y + viewport_height)
+		
 		return pixels_above, pixels_below
 
 	async def reset_context(self):
-		"""Reset the browser session
-		Call this when you don't want to kill the context but just kill the state
-		"""
-		# close all tabs and clear cached state
+		"""Reset the browser context by closing all tabs and opening a new one"""
+		driver = await self.get_current_driver()
+		
+		# Close all tabs except the first one
+		handles = driver.window_handles
+		current_handle = driver.current_window_handle
+		
+		# Switch to first tab if not already there
+		if current_handle != handles[0]:
+			driver.switch_to.window(handles[0])
+			
+		# Close all other tabs
+		for handle in handles[1:]:
+			driver.switch_to.window(handle)
+			driver.close()
+			
+		# Go back to first tab
+		driver.switch_to.window(handles[0])
+		
+		# Navigate to blank page
+		driver.get("about:blank")
+		
+		# Reset cached state
 		session = await self.get_session()
-
-		pages = session.context.pages
-		for page in pages:
-			await page.close()
-
 		session.cached_state = self._get_initial_state()
-		session.current_page = await session.context.new_page()
+		
+		await self._wait_for_page_load()
 
-	def _get_initial_state(self, page: Optional[Page] = None) -> BrowserState:
+	def _get_initial_state(self) -> BrowserState:
 		"""Get the initial state of the browser"""
 		return BrowserState(
 			element_tree=DOMElementNode(
@@ -1132,8 +1064,8 @@ class BrowserContext:
 				children=[],
 			),
 			selector_map={},
-			url=page.url if page else '',
-			title='',
+			url="",
+			title="",
 			screenshot=None,
 			tabs=[],
 		)

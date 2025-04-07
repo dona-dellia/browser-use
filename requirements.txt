@@ -1,0 +1,17 @@
+# Core dependencies
+selenium>=4.15.2
+webdriver-manager>=4.0.1
+lxml>=4.9.3
+requests>=2.31.0
+asyncio>=3.4.3
+
+# Agent dependencies
+langchain>=0.0.335
+langchain-core>=0.1.3
+langchain-community>=0.0.14
+langchain-openai>=0.0.2
+
+# Optionals
+nest-asyncio>=1.5.8  # For Jupyter notebooks 
+pillow>=10.1.0  # For image handling
+beautifulsoup4>=4.12.2  # For better HTML parsing 

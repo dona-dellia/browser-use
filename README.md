@@ -21,7 +21,16 @@
 
 🌩️ Skip the setup - try our hosted version for instant browser automation! [Try it now](https://cloud.browser-use.com).
 
-# Quick start
+# Browser Use - Selenium Edition
+
+This is the Selenium version of browser-use, a library that enables AI agents to control web browsers. 
+
+## Migration from Playwright
+
+This repository contains a Selenium-based implementation of browser-use, migrated from the original Playwright version. 
+For migration instructions, see the [Migration Guide](MIGRATION_GUIDE.md).
+
+## Installation
 
 With pip:
 
@@ -29,54 +38,84 @@ With pip:
 pip install browser-use
 ```
 
-install playwright:
+Install Selenium WebDrivers:
 
 ```bash
-playwright install
+python install.py
 ```
 
-Spin up your agent:
+## Quick Start
 
 ```python
 from langchain_openai import ChatOpenAI
-from browser_use import Agent
+from browser_use import Agent, Browser, BrowserConfig
 import asyncio
 from dotenv import load_dotenv
 load_dotenv()
 
+# Initialize the browser with Selenium
+browser_config = BrowserConfig(
+    headless=False,
+    browser_type="chrome"  # You can also use "firefox" or "edge"
+)
+
+browser = Browser(config=browser_config)
+
+# Create an agent
 async def main():
     agent = Agent(
-        task="Go to Reddit, search for 'browser-use', click on the first post and return the first comment.",
+        task="Compare the price of gpt-4o and DeepSeek-V3",
         llm=ChatOpenAI(model="gpt-4o"),
+        browser=browser
     )
     result = await agent.run()
     print(result)
+    
+    # Close the browser
+    await browser.close()
 
-asyncio.run(main())
+# Run the agent
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-Add your API keys for the provider you want to use to your `.env` file.
+## Key Features
 
-```bash
-OPENAI_API_KEY=
+- Built on Selenium WebDriver for robust browser automation
+- Supports Chrome, Firefox, and Edge browsers
+- Integrated with LangChain LLMs for powerful agent capabilities
+- Rich DOM interaction and extraction capabilities
+- Support for advanced browser automation scenarios
+
+## Browser Configuration
+
+The library provides a flexible configuration system for browsers:
+
+```python
+from browser_use import Browser, BrowserConfig
+
+# Configure based on your needs
+config = BrowserConfig(
+    headless=True,  # Run in headless mode (no UI)
+    browser_type="chrome",  # "chrome", "firefox", or "edge"
+    extra_args=["--disable-gpu", "--window-size=1280,1100"],  # Browser arguments
+    user_agent="Custom User Agent String"  # Set custom user agent
+)
+
+browser = Browser(config=config)
 ```
 
-For other settings, models, and more, check out the [documentation 📕](https://docs.browser-use.com).
+## Documentation
 
+For full documentation, visit [https://docs.browser-use.com](https://docs.browser-use.com).
 
-### Test with UI
+## Contributing
 
-You can test [browser-use with a UI repository](https://github.com/browser-use/web-ui)
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Or simply run the gradio example:
+## License
 
-```
-uv pip install gradio
-```
-
-```bash
-python examples/ui/gradio_demo.py
-```
+This project is licensed under the terms of the LICENSE file included in the repository.
 
 # Demos
 

@@ -104,16 +104,15 @@ llm= ChatOpenAI(
     )
 agent = Agent(
 		task=(
-			"""0.in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home
-   			1. Click in the change objects page
-      2. Enter change number pnr: PNR14551G
-      3. Click in GO button
-      4. check if the all the affected regions in the table are marked as Sucess"""
+			"""
+                0. navigate to https://www.google.com
+                1. search for 'music' in the search bar
+            """
 		),
 		llm=llm,
 		use_vision=False,
 		max_failures=10,
-		initial_actions=initial_actions,
+		# initial_actions=initial_actions,
 		validate_output=False,
 		browser_context=context,
 		controller=controller,

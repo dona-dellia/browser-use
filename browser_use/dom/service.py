@@ -1,154 +1,136 @@
+"""
+DOM service for extracting and processing DOM elements.
+"""
+
+import asyncio
+import json
 import logging
-from importlib import resources
-from typing import Optional
+import os
+from typing import Dict, List, Optional, Set, Tuple, Any, TypeVar, cast
 
-from playwright.async_api import Page
+# Selenium imports
+from selenium import webdriver
+from selenium.webdriver.remote.webelement import WebElement
 
-from browser_use.dom.history_tree_processor.view import Coordinates
-from browser_use.dom.views import (
-	CoordinateSet,
-	DOMBaseNode,
-	DOMElementNode,
-	DOMState,
-	DOMTextNode,
-	SelectorMap,
-	ViewportInfo,
-)
+from browser_use.dom.views import DOMBaseNode, DOMElementNode, DOMTextNode, SelectorMap
 
 logger = logging.getLogger(__name__)
 
+# Generic type for the context
+T = TypeVar('T')
 
 class DomService:
-	def __init__(self, page: Page):
-		self.page = page
-		self.xpath_cache = {}
+	"""Service for extracting and processing DOM elements"""
 
-	# region - Clickable elements
-	async def get_clickable_elements(
-		self,
-		highlight_elements: bool = True,
-		focus_element: int = -1,
-		viewport_expansion: int = 0,
-	) -> DOMState:
-		element_tree = await self._build_dom_tree(highlight_elements, focus_element, viewport_expansion)
-		selector_map = self._create_selector_map(element_tree)
+	def __init__(self):
+		script_dir = os.path.dirname(os.path.abspath(__file__))
+		with open(os.path.join(script_dir, "buildDomTree.js"), "r") as f:
+			self.build_dom_tree_script = f.read()
 
-		return DOMState(element_tree=element_tree, selector_map=selector_map)
-
-	async def _build_dom_tree(
-		self,
-		highlight_elements: bool,
-		focus_element: int,
-		viewport_expansion: int,
+	async def extract_dom_tree(
+		self, 
+		browser_context: Any, 
+		viewport_expansion: int = 500
 	) -> DOMElementNode:
-		js_code = resources.read_text('browser_use.dom', 'buildDomTree.js')
-
-		args = {
-			'doHighlightElements': highlight_elements,
-			'focusHighlightIndex': focus_element,
-			'viewportExpansion': viewport_expansion,
-		}
-
-		eval_page = await self.page.evaluate(js_code, args)  # This is quite big, so be careful
-		html_to_dict = self._parse_node(eval_page)
-
-		if html_to_dict is None or not isinstance(html_to_dict, DOMElementNode):
-			raise ValueError('Failed to parse HTML to dictionary')
-
-		return html_to_dict
-
-	def _create_selector_map(self, element_tree: DOMElementNode) -> SelectorMap:
-		selector_map = {}
-
-		def process_node(node: DOMBaseNode):
-			if isinstance(node, DOMElementNode):
-				if node.highlight_index is not None:
-					selector_map[node.highlight_index] = node
-
-				for child in node.children:
-					process_node(child)
-
-		process_node(element_tree)
-		return selector_map
-
-	def _parse_node(
-		self,
-		node_data: dict,
-		parent: Optional[DOMElementNode] = None,
-	) -> Optional[DOMBaseNode]:
-		if not node_data:
-			return None
-
-		if node_data.get('type') == 'TEXT_NODE':
-			text_node = DOMTextNode(
-				text=node_data['text'],
-				is_visible=node_data['isVisible'],
-				parent=parent,
-			)
-			return text_node
-
-		tag_name = node_data['tagName']
-
-		# Parse coordinates if they exist
-		viewport_coordinates = None
-		page_coordinates = None
-		viewport_info = None
-
-		if 'viewportCoordinates' in node_data:
-			viewport_coordinates = CoordinateSet(
-				top_left=Coordinates(**node_data['viewportCoordinates']['topLeft']),
-				top_right=Coordinates(**node_data['viewportCoordinates']['topRight']),
-				bottom_left=Coordinates(**node_data['viewportCoordinates']['bottomLeft']),
-				bottom_right=Coordinates(**node_data['viewportCoordinates']['bottomRight']),
-				center=Coordinates(**node_data['viewportCoordinates']['center']),
-				width=node_data['viewportCoordinates']['width'],
-				height=node_data['viewportCoordinates']['height'],
-			)
-
-		if 'pageCoordinates' in node_data:
-			page_coordinates = CoordinateSet(
-				top_left=Coordinates(**node_data['pageCoordinates']['topLeft']),
-				top_right=Coordinates(**node_data['pageCoordinates']['topRight']),
-				bottom_left=Coordinates(**node_data['pageCoordinates']['bottomLeft']),
-				bottom_right=Coordinates(**node_data['pageCoordinates']['bottomRight']),
-				center=Coordinates(**node_data['pageCoordinates']['center']),
-				width=node_data['pageCoordinates']['width'],
-				height=node_data['pageCoordinates']['height'],
-			)
-
-		if 'viewport' in node_data:
-			viewport_info = ViewportInfo(
-				scroll_x=node_data['viewport']['scrollX'],
-				scroll_y=node_data['viewport']['scrollY'],
-				width=node_data['viewport']['width'],
-				height=node_data['viewport']['height'],
-			)
-
-		element_node = DOMElementNode(
-			tag_name=tag_name,
-			xpath=node_data['xpath'],
-			attributes=node_data.get('attributes', {}),
-			children=[],  # Initialize empty, will fill later
-			is_visible=node_data.get('isVisible', False),
-			is_interactive=node_data.get('isInteractive', False),
-			is_top_element=node_data.get('isTopElement', False),
-			highlight_index=node_data.get('highlightIndex'),
-			shadow_root=node_data.get('shadowRoot', False),
-			parent=parent,
-			viewport_coordinates=viewport_coordinates,
-			page_coordinates=page_coordinates,
-			viewport_info=viewport_info,
+		"""
+		Extract the DOM tree from the current page.
+		
+		Args:
+			browser_context: The browser context
+			viewport_expansion: How much to expand the viewport for element extraction
+								(-1 for all elements, 0 for only viewport elements)
+		
+		Returns:
+			The DOM tree as a DOMElementNode
+		"""
+		driver = await browser_context.get_current_driver()
+		
+		# Execute the JavaScript to build the DOM tree
+		result = driver.execute_script(
+			self.build_dom_tree_script + 
+			f"\nreturn buildDOMTree({viewport_expansion});"
 		)
+		
+		# Parse the DOM tree from the result
+		return self._parse_dom_tree(result)
 
-		children: list[DOMBaseNode] = []
-		for child in node_data.get('children', []):
-			if child is not None:
-				child_node = self._parse_node(child, parent=element_node)
-				if child_node is not None:
-					children.append(child_node)
+	def _parse_dom_tree(self, dom_data: Dict[str, Any]) -> DOMElementNode:
+		"""
+		Parse the DOM tree from the JavaScript result.
+		
+		Args:
+			dom_data: The DOM tree data from JavaScript
+		
+		Returns:
+			The parsed DOM tree
+		"""
+		# Create root element
+		root = DOMElementNode(
+			tag_name=dom_data.get('tagName', 'root'),
+			xpath=dom_data.get('xpath', ''),
+			is_visible=dom_data.get('isVisible', True),
+			attributes=dom_data.get('attributes', {}),
+			parent=None,
+			children=[],
+			highlight_index=dom_data.get('highlightIndex'),
+			is_interactive=dom_data.get('isInteractive', False),
+			is_top_element=dom_data.get('isTopElement', False),
+			shadow_root=dom_data.get('shadowRoot', False),
+		)
+		
+		# Process children recursively
+		children = []
+		if 'children' in dom_data and isinstance(dom_data['children'], list):
+			for child_data in dom_data['children']:
+				# Handle text nodes
+				if child_data.get('type') == 'TEXT_NODE':
+					child = DOMTextNode(
+						text=child_data.get('text', ''),
+						is_visible=child_data.get('isVisible', True),
+						parent=root
+					)
+					children.append(child)
+				else:
+					# Handle element nodes
+					child = self._parse_dom_tree(child_data)
+					child.parent = root
+					children.append(child)
+				
+		root.children = children
+		return root
 
-		element_node.children = children
-
-		return element_node
-
-	# endregion
+	async def get_selector_map(self, browser_context: Any) -> SelectorMap:
+		"""
+		Get a map of element indices to DOM elements.
+		
+		Args:
+			browser_context: The browser context
+		
+		Returns:
+			A mapping of element indices to DOM elements
+		"""
+		element_tree = await self.extract_dom_tree(browser_context)
+		return self._build_selector_map(element_tree)
+		
+	def _build_selector_map(self, root: DOMElementNode) -> SelectorMap:
+		"""
+		Build a mapping of highlight indices to DOM elements.
+		
+		Args:
+			root: The root DOM element
+		
+		Returns:
+			A mapping of highlight indices to DOM elements
+		"""
+		selector_map: SelectorMap = {}
+		
+		def traverse(node: DOMBaseNode):
+			if isinstance(node, DOMElementNode) and node.highlight_index is not None:
+				selector_map[node.highlight_index] = node
+				
+			if isinstance(node, DOMElementNode):
+				for child in node.children:
+					traverse(child)
+				
+		traverse(root)
+		return selector_map
