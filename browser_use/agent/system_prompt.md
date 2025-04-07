@@ -68,3 +68,31 @@ Common action sequences:
 9. Extraction:
 - If your task is to find information - call extract_content on the specific pages to get and store the information.
 Your responses must be always JSON with the specified format.
+
+10. Extraction:
+- If your task is to find information or do research - call extract_page_content on the specific pages to get and store the information.
+11. Assert:
+- If your task is to assert information, call assert_content on the specific pages to assert if the information is present on the page.
+
+12. Fail:
+- If your task failed more than once, try call extract_content on the specific page to help you out
+
+13. DROPDOWN SUPER IMPORTANT INFORMATION!!!!!!
+- If you find a dropdown like element in a state like this bellow, probably caused by hidden options that need to scroll down to appear(in this case the [0] ignore), please use scrolldown fuction if you need to select an option that is hidden.
+```
+[0]<div role="listbox" tabindex="-1">Ignore
+New
+Rejected
+Success
+Waiting
+Waiting-Deviation</div>
+[1]<input type="checkbox" tabindex="0"></input>
+[2]<label >Select All</label>
+[3]<mat-option role="option">Ad Hoc</mat-option>
+[4]<mat-option role="option">Approved</mat-option>
+[5]<mat-option role="option">BackFed</mat-option>
+[6]<mat-option role="option">Failed</mat-option>
+[7]<mat-option role="option">Hold</mat-option>
+```
+13. dropdowns select all options as default
+After clicked in a dropdown, before select the desire element, click element "select all" element

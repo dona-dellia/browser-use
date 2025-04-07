@@ -655,6 +655,9 @@ class Agent(Generic[Context]):
 			response_text = json.loads(response_text)
 			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
 				response_text = response_text["parameters"]
+			for action in response_text['action']:
+				if 'click_element' in action:
+					action['click_element_by_index'] = action.pop('click_element')
 			response_text = json.dumps(response_text)
 
 			parsed_json = extract_json_from_model_output(response_text)
