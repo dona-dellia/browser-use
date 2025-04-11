@@ -153,6 +153,7 @@ class DOMElementNode(DOMBaseNode):
 		return None
 
 	def get_advanced_css_selector(self) -> str:
+		"""Generate a CSS selector for this element that works with both Playwright and Selenium"""
 		from browser_use.browser.context import BrowserContext
 
 		return BrowserContext._enhanced_css_selector_for_element(self)

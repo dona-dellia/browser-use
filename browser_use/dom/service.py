@@ -2,7 +2,7 @@ import logging
 from importlib import resources
 from typing import Optional
 
-from playwright.async_api import Page
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from browser_use.dom.history_tree_processor.view import Coordinates
 from browser_use.dom.views import (
@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class DomService:
-	def __init__(self, page: Page):
-		self.page = page
+	def __init__(self, driver: WebDriver):
+		self.driver = driver
 		self.xpath_cache = {}
 
 	# region - Clickable elements
@@ -49,7 +49,12 @@ class DomService:
 			'viewportExpansion': viewport_expansion,
 		}
 
-		eval_page = await self.page.evaluate(js_code, args)  # This is quite big, so be careful
+		# Convert args to JavaScript format
+		args_str = f"{{ doHighlightElements: {str(highlight_elements).lower()}, focusHighlightIndex: {focus_element}, viewportExpansion: {viewport_expansion} }}"
+		
+		# Execute JavaScript in Selenium
+		eval_page = self.driver.execute_script(f"return ({js_code})({args_str})")
+		
 		html_to_dict = self._parse_node(eval_page)
 
 		if html_to_dict is None or not isinstance(html_to_dict, DOMElementNode):

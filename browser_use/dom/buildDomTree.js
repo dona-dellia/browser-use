@@ -9,10 +9,10 @@
 
     function highlightElement(element, index, parentIframe = null) {
         // Create or get highlight container
-        let container = document.getElementById('playwright-highlight-container');
+        let container = document.getElementById('browser-user-highlight-container');
         if (!container) {
             container = document.createElement('div');
-            container.id = 'playwright-highlight-container';
+            container.id = 'browser-user-highlight-container';
             container.style.position = 'absolute';
             container.style.pointerEvents = 'none';
             container.style.top = '0';
@@ -59,7 +59,7 @@
 
         // Create label
         const label = document.createElement('div');
-        label.className = 'playwright-highlight-label';
+        label.className = 'browser-user-highlight-label';
         label.style.position = 'absolute';
         label.style.background = baseColor;
         label.style.color = 'white';
@@ -92,7 +92,7 @@
         container.appendChild(label);
 
         // Store reference for cleanup
-        element.setAttribute('browser-user-highlight-id', `playwright-highlight-${index}`);
+        element.setAttribute('browser-user-highlight-id', `browser-user-highlight-${index}`);
 
         return index + 1;
     }
