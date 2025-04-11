@@ -126,17 +126,6 @@ class BrowserContextConfig:
 	include_dynamic_attributes: bool = True
 
 
-class Page(Protocol):
-	async def evaluate(self, script: str, *args: Any) -> Any: ...
-
-# Create a wrapper class that adapts Selenium's WebDriver to the expected Page interface
-class SeleniumPageWrapper(Page):
-	def __init__(self, driver: Chrome):
-		self.driver = driver
-
-	async def evaluate(self, script: str, *args: Any) -> Any:
-		return self.driver.execute_script(script, *args)
-
 @dataclass
 class BrowserSession:
 	driver: Chrome
@@ -436,7 +425,7 @@ class BrowserContext:
 		try:
 			await self.remove_highlights()
 
-			dom_service = DomService(SeleniumPageWrapper(driver))
+			dom_service = DomService(driver)
 			content = await dom_service.get_clickable_elements(
 				focus_element=focus_element,
 				viewport_expansion=self.config.viewport_expansion,
@@ -485,12 +474,12 @@ class BrowserContext:
 			driver = await self.get_current_driver()
 			driver.execute_script("""
 				try {
-					const container = document.getElementById('playwright-highlight-container');
+					const container = document.getElementById('browser-user-highlight-container');
 					if (container) {
 						container.remove();
 					}
 
-					const highlightedElements = document.querySelectorAll('[browser-user-highlight-id^="playwright-highlight-"]');
+					const highlightedElements = document.querySelectorAll('[browser-user-highlight-id^="browser-user-highlight-"]');
 					highlightedElements.forEach(el => {
 						el.removeAttribute('browser-user-highlight-id');
 					});
@@ -817,10 +806,11 @@ class BrowserContext:
 		return selector_map[index]
 
 	async def locate_element(self, element: DOMElementNode) -> WebElement | None:
-		"""Locate a WebElement using the provided DOMElementNode's selector."""
+		"""Locate a WebElement using the provided DOMElementNode's CSS selector."""
 		driver = await self.get_current_driver()
 		try:
-			return driver.find_element(By.CSS_SELECTOR, element.selector)
+			css_selector = self._enhanced_css_selector_for_element(element)
+			return driver.find_element(By.CSS_SELECTOR, css_selector)
 		except Exception as e:
 			logger.debug(f'Failed to locate element: {str(e)}')
 			return None
