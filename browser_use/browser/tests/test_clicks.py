@@ -14,7 +14,7 @@ async def test_highlight_elements():
 	browser = Browser(config=BrowserConfig(headless=False, disable_security=True))
 
 	async with await browser.new_context() as context:
-		page = await context.get_current_page()
+		driver = await context.get_current_driver()
 		# await page.goto('https://immobilienscout24.de')
 		# await page.goto('https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/service-plans')
 		# await page.goto('https://google.com/search?q=elon+musk')
@@ -22,7 +22,7 @@ async def test_highlight_elements():
 		# await page.goto('https://www.w3schools.com/tags/tryit.asp?filename=tryhtml_iframe')
 		# await page.goto('https://dictionary.cambridge.org')
 		# await page.goto('https://github.com')
-		await page.goto('https://huggingface.co/')
+		driver.get('https://huggingface.co/')
 
 		await asyncio.sleep(1)
 
