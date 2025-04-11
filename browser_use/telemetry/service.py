@@ -40,7 +40,6 @@ class ProductTelemetry:
 		self.debug_logging = os.getenv('BROWSER_USE_LOGGING_LEVEL', 'info').lower() == 'debug'
 
 		if True:
-			print("aloo")
 			self._posthog_client = None
 		else:
 			logger.info(

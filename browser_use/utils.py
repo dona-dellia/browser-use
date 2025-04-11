@@ -317,5 +317,5 @@ def singleton(cls):
 
 def check_env_variables(keys: list[str], any_or_all=all) -> bool:
 	"""Check if all required environment variables are set"""
-	print(keys)
+	
 	return any_or_all(os.getenv(key).strip() for key in keys)

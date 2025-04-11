@@ -217,6 +217,7 @@ class Registry(Generic[Context]):
 				]
 			)
 		)
+		print(">> create_action_model chamado com ações disponíveis:", list(self.registry.actions.keys()))
 
 		return create_model('ActionModel', __base__=ActionModel, **fields)  # type:ignore
 

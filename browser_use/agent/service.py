@@ -629,7 +629,9 @@ class Agent(Generic[Context]):
 		print("chute")
 		"""Get next action from LLM based on current state"""
 		input_messages = self._convert_input_messages(input_messages)
-
+		print("------------------------------------------------")
+		print(input_messages)
+		print("------------------------------------------------")
 		if self.tool_calling_method == 'raw':
 			logger.debug(f'Using {self.tool_calling_method} for {self.chat_model_library}')
 			try:
@@ -715,12 +717,10 @@ class Agent(Generic[Context]):
 	# @observe(name='agent.run', ignore_output=True)
 	@time_execution_async('--run (agent)')
 	async def run(
-		self, max_steps: int = 100, on_step_start: AgentHookFunc | None = None, on_step_end: AgentHookFunc | None = None
+		self, max_steps: int = 50, on_step_start: AgentHookFunc | None = None, on_step_end: AgentHookFunc | None = None
 	) -> AgentHistoryList:
 		"""Execute the task with maximum number of steps"""
-		print("a")
 		loop = asyncio.get_event_loop()
-		print("b")
 
 		# Set up the Ctrl+C signal handler with callbacks specific to this agent
 		from browser_use.utils import SignalHandler
@@ -733,57 +733,45 @@ class Agent(Generic[Context]):
 			exit_on_second_int=True,
 		)
 		signal_handler.register()
-		print("c")
 
 		# Start non-blocking LLM connection verification
 		assert self.llm._verified_api_keys, 'Failed to verify LLM API keys'
-		print("d")
 
 		try:
 			self._log_agent_run()
-			print("e")
 
 			# Execute initial actions if provided
 			if self.initial_actions:
 				result = await self.multi_act(self.initial_actions, check_for_new_elements=False)
 				self.state.last_result = result
-			print("f")
 
 			for step in range(max_steps):
 				# Check if waiting for user input after Ctrl+C
 				if self.state.paused:
 					signal_handler.wait_for_resume()
 					signal_handler.reset()
-				print("g")
 
 				# Check if we should stop due to too many failures
 				if self.state.consecutive_failures >= self.settings.max_failures:
 					logger.error(f'❌ Stopping due to {self.settings.max_failures} consecutive failures')
 					break
-				print("h")
 				# Check control flags before each step
 				if self.state.stopped:
 					logger.info('Agent stopped')
 					break
-				print("i")
 				
 				while self.state.paused:
 					await asyncio.sleep(0.2)  # Small delay to prevent CPU spinning
 					if self.state.stopped:  # Allow stopping while paused
 						break
-				print("j")
 
 				if on_step_start is not None:
 					await on_step_start(self)
-				print("k")
-
 				step_info = AgentStepInfo(step_number=step, max_steps=max_steps)
 				await self.step(step_info)
-				print("l")
 
 				if on_step_end is not None:
 					await on_step_end(self)
-				print("m")
 
 				if self.state.history.is_done():
 					if self.settings.validate_output and step < max_steps - 1:
@@ -837,15 +825,11 @@ class Agent(Generic[Context]):
 	) -> list[ActionResult]:
 		"""Execute multiple actions"""
 		results = []
-		print("AA")
 		cached_selector_map = await self.browser_context.get_selector_map()
-		print("AA1")
   
 		cached_path_hashes = set(e.hash.branch_path_hash for e in cached_selector_map.values())
-		print("BB")
 
 		await self.browser_context.remove_highlights()
-		print("CC")
 
 		for i, action in enumerate(actions):
 			if action.get_index() is not None and i != 0:
@@ -857,11 +841,8 @@ class Agent(Generic[Context]):
 					logger.info(msg)
 					results.append(ActionResult(extracted_content=msg, include_in_memory=True))
 					break
-			print("DD")
-
 			try:
 				await self._raise_if_stopped_or_paused()
-				print("EE")
 
 				result = await self.controller.act(
 					action,
@@ -873,7 +854,6 @@ class Agent(Generic[Context]):
 				)
 
 				results.append(result)
-				print("FF")
 
 				logger.debug(f'Executed action {i + 1} / {len(actions)}')
 				if results[-1].is_done or results[-1].error or i == len(actions) - 1:
