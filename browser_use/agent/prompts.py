@@ -21,13 +21,14 @@ class SystemPrompt:
 		self.max_actions_per_step = max_actions_per_step
 		prompt = ''
 		if override_system_message:
-			prompt = override_system_message
+			prompt = override_system_message 
 		else:
 			self._load_prompt_template()
 			prompt = self.prompt_template.format(max_actions=self.max_actions_per_step)
 
-		if extend_system_message:
-			prompt += f'\n{extend_system_message}'
+		if True:
+			if extend_system_message == None: prompt += f'\n  Functions: {self.default_action_description}'
+			else: prompt += f'\n{extend_system_message} Functions: {self.default_action_description}'
 
 		self.system_message = SystemMessage(content=prompt)
 
@@ -50,8 +51,7 @@ class SystemPrompt:
 		return self.system_message
 
 
-# Functions:
-# {self.default_action_description}
+
 
 # Example:
 # {self.example_response()}

@@ -626,12 +626,8 @@ class Agent(Generic[Context]):
 
 	@time_execution_async('--get_next_action (agent)')
 	async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
-		print("chute")
 		"""Get next action from LLM based on current state"""
 		input_messages = self._convert_input_messages(input_messages)
-		print("------------------------------------------------")
-		print(input_messages)
-		print("------------------------------------------------")
 		if self.tool_calling_method == 'raw':
 			logger.debug(f'Using {self.tool_calling_method} for {self.chat_model_library}')
 			try:
