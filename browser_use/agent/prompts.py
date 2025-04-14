@@ -27,7 +27,7 @@ class SystemPrompt:
 			prompt = self.prompt_template.format(max_actions=self.max_actions_per_step)
 
 		if True:
-			if extend_system_message == None: prompt += f'\n  Functions: {self.default_action_description}'
+			if extend_system_message is None: prompt += f'\n  Functions: {self.default_action_description}'
 			else: prompt += f'\n{extend_system_message} Functions: {self.default_action_description}'
 
 		self.system_message = SystemMessage(content=prompt)

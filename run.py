@@ -42,11 +42,15 @@ llm= ChatOpenAI(
         timeout=30
         
     )
+
+"""
+   in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home 
+  GIVEN a user is on the Change Objects landing page and is logged in with their user ID retrievable from local storage, WHEN the user selects the 'Status' field in the search interface, THEN the 'WD' status should be clicked 
+   """
 agent = Agent(
 		task=(
 			"""
-   in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home 
-  GIVEN a user is on the Change Objects landing page and is logged in with their user ID retrievable from local storage, WHEN the user selects the 'Status' field in the search interface, THEN the 'WD' status should be clicked 
+   go to google, search about dell, open the last page about it in another tab, and clode the google tab
    """),
 		llm=llm,
 		use_vision=False,
