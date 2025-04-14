@@ -2,7 +2,7 @@ import asyncio
 import json
 import enum
 import logging
-from typing import Dict, Generic, Optional, Type, TypeVar
+from typing import Dict, Generic, Optional, Type, TypeVar, Callable
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import PromptTemplate
@@ -14,7 +14,8 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-# from lmnr.sdk.laminar import Laminar
+from lmnr.sdk.laminar import Laminar
+from lmnr.sdk.decorators import observe
 
 from browser_use.agent.views import ActionModel, ActionResult
 from browser_use.browser.context import BrowserContext
@@ -31,7 +32,7 @@ from browser_use.controller.views import (
 	SendKeysAction,
 	SwitchTabAction,
 )
-from browser_use.utils import time_execution_sync
+from browser_use.utils import time_execution_async, time_execution_sync
 
 logger = logging.getLogger(__name__)
 
@@ -432,6 +433,55 @@ class Controller(Generic[Context]):
 	def action(self, description: str, **kwargs):
 		"""Register a custom action"""
 		return self.registry.action(description, **kwargs)
+
+
+	@observe(name='controller.multi_act')
+	@time_execution_async('--multi-act')
+	async def multi_act(
+ 		self,
+ 		actions: list[ActionModel],
+ 		browser_context: BrowserContext,
+ 		check_break_if_paused: Callable[[], bool],
+ 		check_for_new_elements: bool = True,
+ 		page_extraction_llm: Optional[BaseChatModel] = None,
+ 		sensitive_data: Optional[Dict[str, str]] = None,
+ 	) -> list[ActionResult]:
+		"""Execute multiple actions"""
+		results = []
+
+		session = await browser_context.get_session()
+		cached_selector_map = session.cached_state.selector_map
+		cached_path_hashes = set(e.hash.branch_path_hash for e in cached_selector_map.values())
+
+		check_break_if_paused()
+
+		await browser_context.remove_highlights()
+
+		for i, action in enumerate(actions):
+			check_break_if_paused()
+
+			if action.get_index() is not None and i != 0:
+				new_state = await browser_context.get_state()
+				new_path_hashes = set(e.hash.branch_path_hash for e in new_state.selector_map.values())
+				if check_for_new_elements and not new_path_hashes.issubset(cached_path_hashes):
+					# next action requires index but there are new elements on the page
+					msg = f'Something new appeared after action {i} / {len(actions)}'
+					logger.info(msg)
+					results.append(ActionResult(extracted_content=msg, include_in_memory=True))
+					break
+
+			check_break_if_paused()
+
+			results.append(await self.act(action, browser_context, page_extraction_llm, sensitive_data))
+
+			logger.debug(f'Executed action {i + 1} / {len(actions)}')
+			if results[-1].is_done or results[-1].error or i == len(actions) - 1:
+				break
+
+			await asyncio.sleep(browser_context.config.wait_between_actions)
+			# hash all elements. if it is a subset of cached_state its fine - else break (new elements on page)
+
+		return results
 
 	# Act --------------------------------------------------------------------
 
