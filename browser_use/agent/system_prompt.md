@@ -78,7 +78,7 @@ Your responses must be always JSON with the specified format.
 - If your task failed more than once, try call extract_content on the specific page to help you out
 
 13. DROPDOWN SUPER IMPORTANT INFORMATION!!!!!!
-- If you find a dropdown like element in a state like this bellow, probably caused by hidden options that need to scroll down to appear(in this case the [0] ignore), please use scrolldown fuction if you need to select an option that is hidden.
+- If you find a dropdown like element in a state like this below, probably caused by hidden options that need to scroll down to appear(in this case the [0] ignore), please use scrolldown function if you need to select an option that is hidden.
 ```
 [0]<div role="listbox" tabindex="-1">Ignore
 New

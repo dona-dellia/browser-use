@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-#controle
+#controller
 from prism_configs.prism_controller import controller
 #browser
 from prism_configs.prism_browser import browser,context
