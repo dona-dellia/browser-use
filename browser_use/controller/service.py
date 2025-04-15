@@ -13,6 +13,9 @@ from playwright.async_api import ElementHandle, Page
 # from lmnr.sdk.laminar import Laminar
 from pydantic import BaseModel
 
+import os
+import browser_use.controller.selenium_snippets as selenium_snippets
+
 from browser_use.agent.views import ActionModel, ActionResult
 from browser_use.browser.context import BrowserContext
 from browser_use.controller.registry.service import Registry
@@ -48,17 +51,28 @@ class Controller(Generic[Context]):
 		self,
 		exclude_actions: list[str] = [],
 		output_model: Optional[Type[BaseModel]] = None,
+  		save_selenium_code: Optional[str] = None,
+		save_py: Optional[str] = None,
 	):
+		if not save_py:
+			save_py = "output"
+
+		self.save_py = save_py
+		self.save_selenium_code = save_selenium_code
+
+		if self.save_selenium_code and '/' not in self.save_selenium_code:
+			self.save_selenium_code = f'{self.save_selenium_code}/'
+
+		self._save_selenium_code(selenium_snippets.initial_selenium_code, overwrite=True)
 		self.registry = Registry[Context](exclude_actions)
 
 		"""Register all default browser actions"""
-
+	
 		if output_model is not None:
 			# Create a new model that extends the output model with success parameter
 			class ExtendedOutputModel(BaseModel):  # type: ignore
 				success: bool = True
 				data: output_model
-
 			@self.registry.action(
 				'Complete task - with return text and if the task is finished (success=True) or not yet  completely finished (success=False), because last step is reached',
 				param_model=ExtendedOutputModel,
@@ -89,10 +103,14 @@ class Controller(Generic[Context]):
 		)
 		async def search_google(params: SearchGoogleAction, browser: BrowserContext):
 			page = await browser.get_current_page()
-			await page.goto(f'https://www.google.com/search?q={params.query}&udm=14')
+			url = f'https://www.google.com/search?q={params.query}&udm=14'
+			await page.goto(url)
 			await page.wait_for_load_state()
 			msg = f'🔍  Searched for "{params.query}" in Google'
 			logger.info(msg)
+   
+			selenium_code = selenium_snippets.go_to(url)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Navigate to URL in the current tab', param_model=GoToUrlAction)
@@ -102,6 +120,8 @@ class Controller(Generic[Context]):
 			await page.wait_for_load_state()
 			msg = f'🔗  Navigated to {params.url}'
 			logger.info(msg)
+			selenium_code = selenium_snippets.go_to(params.url)	
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Go back', param_model=NoParamsAction)
@@ -109,6 +129,8 @@ class Controller(Generic[Context]):
 			await browser.go_back()
 			msg = '🔙  Navigated back'
 			logger.info(msg)
+			selenium_code = selenium_snippets.back()
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# wait for x seconds
@@ -116,6 +138,8 @@ class Controller(Generic[Context]):
 		async def wait(seconds: int = 3):
 			msg = f'🕒  Waiting for {seconds} seconds'
 			logger.info(msg)
+			selenium_code = selenium_snippets.sleep(seconds)
+			self._save_selenium_code(selenium_code)
 			await asyncio.sleep(seconds)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
@@ -126,6 +150,8 @@ class Controller(Generic[Context]):
 				await browser.wait_for_element(params.selector, params.timeout)
 				msg = f'👀  Element with selector "{params.selector}" became visible within {params.timeout}ms.'
 				logger.info(msg)
+				selenium_code = selenium_snippets.wait_to_element(params.selector, params.timeout)
+				self._save_selenium_code(selenium_code)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				err_msg = f'❌  Failed to wait for element "{params.selector}" within {params.timeout}ms: {str(e)}'
@@ -157,7 +183,8 @@ class Controller(Generic[Context]):
 					msg = f'💾  Downloaded file to {download_path}'
 				else:
 					msg = f'🖱️  Clicked button with index {params.index}: {element_node.get_all_text_till_next_clickable_element(max_depth=2)}'
-
+				selenium_code = selenium_snippets.click(element_node.xpath)
+				self._save_selenium_code(selenium_code)
 				logger.info(msg)
 				logger.debug(f'Element xpath: {element_node.xpath}')
 				if len(session.context.pages) > initial_pages:
@@ -165,6 +192,8 @@ class Controller(Generic[Context]):
 					msg += f' - {new_tab_msg}'
 					logger.info(new_tab_msg)
 					await browser.switch_to_tab(-1)
+					selenium_code = selenium_snippets.switch_to_tab(-1)
+					self._save_selenium_code(selenium_code)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				logger.warning(f'Element not clickable with index {params.index} - most likely the page changed')
@@ -186,6 +215,8 @@ class Controller(Generic[Context]):
 							logger.warning(f"Element not clickable with css selector '{params.css_selector}' - {e}")
 							return ActionResult(error=str(e))
 					msg = f'🖱️  Clicked on element with text "{params.css_selector}"'
+					selenium_code = selenium_snippets.click_by_selector(params.css_selector)
+					self._save_selenium_code(selenium_code)
 					return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				logger.warning(f'Element not clickable with selector {params.css_selector} - most likely the page changed')
@@ -207,6 +238,8 @@ class Controller(Generic[Context]):
 							logger.warning(f"Element not clickable with xpath '{params.xpath}' - {e}")
 							return ActionResult(error=str(e))
 					msg = f'🖱️  Clicked on element with text "{params.xpath}"'
+					selenium_code = selenium_snippets.click_by_xpath(params.xpath)
+					self._save_selenium_code(selenium_code)
 					return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				logger.warning(f'Element not clickable with xpath {params.xpath} - most likely the page changed')
@@ -223,6 +256,8 @@ class Controller(Generic[Context]):
 					try:
 						await element_node.scroll_into_view_if_needed()
 						await element_node.click(timeout=1500, force=True)
+						selenium_code = selenium_snippets.click_by_text_js(params.text)
+						self._save_selenium_code(selenium_code)
 					except Exception:
 						try:
 							# Handle with js evaluate if fails to click using playwright
@@ -231,6 +266,8 @@ class Controller(Generic[Context]):
 							logger.warning(f"Element not clickable with text '{params.text}' - {e}")
 							return ActionResult(error=str(e))
 					msg = f'🖱️  Clicked on element with text "{params.text}"'
+					selenium_code = selenium_snippets.click_by_text(params.text)
+					self._save_selenium_code(selenium_code)
 					return ActionResult(extracted_content=msg, include_in_memory=True)
 				else:
 					return ActionResult(error=f"No element found for text '{params.text}'")
@@ -903,3 +940,12 @@ class Controller(Generic[Context]):
 			return ActionResult()
 		except Exception as e:
 			raise e
+	def _save_selenium_code(self, selenium_action: str, overwrite: bool = False) -> None:
+		"""Create directory and save Selenium action to a separate code file if path is specified"""
+		if not self.save_selenium_code:
+			return 
+		os.makedirs(os.path.dirname(self.save_selenium_code), exist_ok=True)        # Save the Selenium action to a dedicated .py file per action
+		file_path = f"{self.save_selenium_code}{self.save_py}.py"
+
+		with open(file_path, 'w' if overwrite else 'a', encoding='utf-8') as f:
+			f.write(selenium_action + '\n')

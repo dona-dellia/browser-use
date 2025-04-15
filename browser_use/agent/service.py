@@ -95,7 +95,7 @@ class Agent(Generic[Context]):
 		# Optional parameters
 		browser: Browser | None = None,
 		browser_context: BrowserContext | None = None,
-		controller: Controller[Context] = Controller(),
+		controller: Controller[Context] = Controller(save_py="code", save_selenium_code="output/"),
 		# Initial agent run parameters
 		sensitive_data: Optional[Dict[str, str]] = None,
 		initial_actions: Optional[List[Dict[str, Dict[str, Any]]]] = None,
