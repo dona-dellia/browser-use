@@ -293,12 +293,12 @@ class Controller(Generic[Context]):
 					main_page.click()
 
 					# Find the matching key or use the original
-					key_to_send = key_mapping.get(params.keys, params.keys)
+					# key_to_send = key_mapping.get(params.keys, params.keys)
 
-					# Create action chain and perform key press
-					actions = ActionChains(driver)
-					actions.send_keys(key_to_send)
-					actions.perform()
+					# # Create action chain and perform key press
+					# actions = ActionChains(driver)
+					# actions.send_keys(key_to_send)
+					# actions.perform()
 
 				keys = params.keys
 
