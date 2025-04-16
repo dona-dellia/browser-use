@@ -281,14 +281,57 @@ class Controller(Generic[Context]):
 					"Control+Shift+T": Keys.CONTROL + Keys.SHIFT + "t",
 				}
 
-				# Find the matching key or use the original
-				key_to_send = key_mapping.get(params.keys, params.keys)
+				active_element = driver.execute_script("""
+					const active = document.activeElement;
+					const isInteractive = active.tagName !== 'BODY' 
+										&& active.tagName !== 'HTML' 
+										&& active !== document.body;
+					return isInteractive;
+				""")
+				if not active_element:
+					main_page = driver.find_element(By.TAG_NAME, 'body')
+					main_page.click()
 
-				# Create action chain and perform key press
-				actions = ActionChains(driver)
-				actions.send_keys(key_to_send)
-				actions.perform()
+					# Find the matching key or use the original
+					key_to_send = key_mapping.get(params.keys, params.keys)
 
+					# Create action chain and perform key press
+					actions = ActionChains(driver)
+					actions.send_keys(key_to_send)
+					actions.perform()
+
+				keys = params.keys
+
+				if '+' in keys:
+					keys_spl = keys.split('+')
+					modifiers = keys_spl[:-1]  # todas as teclas exceto a última
+					final_key = keys_spl[-1]   # última tecla
+
+					actions = ActionChains(driver)
+					# Adiciona key_down para cada modificador
+					for mod in modifiers:
+						mod_key = key_mapping.get(mod, f"'{mod}'")
+						actions.key_down(mod_key)
+
+					# Adiciona a tecla final
+					final_selenium_key = key_mapping.get(final_key, f"'{final_key}'")
+					actions.send_keys(final_selenium_key)
+
+					# Adiciona key_up para cada modificador (em ordem reversa)
+					for mod in reversed(modifiers):
+						mod_key = key_mapping.get(mod, f"'{mod}'")
+						actions.key_up(mod_key)
+
+					actions.perform()
+
+				else:
+					# Tecla única (não é atalho)
+					selenium_key = key_mapping.get(keys, f"'{keys}'")
+					
+					actions = ActionChains(driver)
+					actions.send_keys(selenium_key)
+					actions.perform()
+			
 			except Exception as e:
 				logger.debug(f'Error sending keys: {str(e)}')
 				raise e
@@ -413,13 +456,46 @@ class Controller(Generic[Context]):
 			# Use Selenium's Select class for handling dropdowns
 			try:
 				# Get the dropdown element using XPath
-				dropdown_element = driver.find_element(By.XPATH, dom_element.xpath)
+				# dropdown_element = driver.find_element(By.XPATH, dom_element.xpath)
 				
-				# Create a Select object
-				select = Select(dropdown_element)
+				# # Create a Select object
+				# select = Select(dropdown_element)
 				
-				# Select by visible text
-				select.select_by_visible_text(text)
+				# # Select by visible text
+				# select.select_by_visible_text(text)
+
+				# First check if element is in an iframe
+				iframes = driver.find_elements(By.TAG_NAME, "iframe")
+				found_in_frame = False
+				# Check main frame first
+				try:
+					dropdown = WebDriverWait(driver, 10).until(
+						EC.presence_of_element_located((By.XPATH, '{dropdown_xpath}'))
+					)
+					select = Select(dropdown)
+					select.select_by_visible_text("{text}")
+					found_in_frame = True
+				except:
+					pass
+				# If not found in main frame, check iframes
+				if not found_in_frame:
+					for frame in iframes:
+						try:
+							driver.switch_to.frame(frame)
+							dropdown = WebDriverWait(driver, 10).until(
+								EC.presence_of_element_located((By.XPATH, '{dropdown_xpath}'))
+							)
+							select = Select(dropdown)
+							select.select_by_visible_text("{text}")
+							found_in_frame = True
+							break
+						except:
+							driver.switch_to.default_content()
+							continue
+					# Switch back to default content after checking frames
+					driver.switch_to.default_content()
+				if not found_in_frame:
+					print(f"Could not select option '{text}' in any frame")
 				
 				msg = f"Selected option '{text}' from dropdown at index {index}"
 				logger.info(msg)
