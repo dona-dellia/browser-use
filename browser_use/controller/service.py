@@ -183,7 +183,7 @@ class Controller(Generic[Context]):
 					msg = f'💾  Downloaded file to {download_path}'
 				else:
 					msg = f'🖱️  Clicked button with index {params.index}: {element_node.get_all_text_till_next_clickable_element(max_depth=2)}'
-				selenium_code = selenium_snippets.click(element_node.xpath)
+				selenium_code = selenium_snippets.click_by_selector_xpath_js(element_node.xpath)
 				self._save_selenium_code(selenium_code)
 				logger.info(msg)
 				logger.debug(f'Element xpath: {element_node.xpath}')
@@ -207,16 +207,18 @@ class Controller(Generic[Context]):
 					try:
 						await element_node.scroll_into_view_if_needed()
 						await element_node.click(timeout=1500, force=True)
+						selenium_code = selenium_snippets.click_by_selector(params.css_selector)
+						self._save_selenium_code(selenium_code)
 					except Exception:
 						try:
 							# Handle with js evaluate if fails to click using playwright
 							await element_node.evaluate('el => el.click()')
+							selenium_code = selenium_snippets.click_by_selector_selector_js(params.css_selector)
+							self._save_selenium_code(selenium_code)
 						except Exception as e:
 							logger.warning(f"Element not clickable with css selector '{params.css_selector}' - {e}")
 							return ActionResult(error=str(e))
 					msg = f'🖱️  Clicked on element with text "{params.css_selector}"'
-					selenium_code = selenium_snippets.click_by_selector(params.css_selector)
-					self._save_selenium_code(selenium_code)
 					return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				logger.warning(f'Element not clickable with selector {params.css_selector} - most likely the page changed')
@@ -230,10 +232,14 @@ class Controller(Generic[Context]):
 					try:
 						await element_node.scroll_into_view_if_needed()
 						await element_node.click(timeout=1500, force=True)
+						selenium_code = selenium_snippets.click_by_xpath(params.xpath)
+						self._save_selenium_code(selenium_code)
 					except Exception:
 						try:
 							# Handle with js evaluate if fails to click using playwright
 							await element_node.evaluate('el => el.click()')
+							selenium_code = selenium_snippets.click_by_selector_xpath_js(element_node.xpath)
+							self._save_selenium_code(selenium_code)
 						except Exception as e:
 							logger.warning(f"Element not clickable with xpath '{params.xpath}' - {e}")
 							return ActionResult(error=str(e))
@@ -291,6 +297,8 @@ class Controller(Generic[Context]):
 				msg = f'⌨️  Input sensitive data into index {params.index}'
 			logger.info(msg)
 			logger.debug(f'Element xpath: {element_node.xpath}')
+			selenium_code = selenium_snippets.input_txt(element_node.xpath, params.text)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Save PDF
@@ -318,6 +326,8 @@ class Controller(Generic[Context]):
 			await page.wait_for_load_state()
 			msg = f'🔄  Switched to tab {params.page_id}'
 			logger.info(msg)
+			selenium_code = selenium_snippets.switch_to_tab(params.page_id)	
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Open url in new tab', param_model=OpenTabAction)
@@ -325,6 +335,8 @@ class Controller(Generic[Context]):
 			await browser.create_new_tab(params.url)
 			msg = f'🔗  Opened new tab with {params.url}'
 			logger.info(msg)
+			selenium_code = selenium_snippets.open_tab(params.url)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Close an existing tab', param_model=CloseTabAction)
@@ -412,7 +424,9 @@ class Controller(Generic[Context]):
 				await page.evaluate(f'window.scrollBy(0, {params.amount});')
 			else:
 				await page.evaluate('window.scrollBy(0, window.innerHeight);')
-
+			viewport = page.viewport_size
+			selenium_code = selenium_snippets.scroll_down(params.amount, viewport=viewport)
+			self._save_selenium_code(selenium_code)
 			amount = f'{params.amount} pixels' if params.amount is not None else 'one page'
 			msg = f'🔍  Scrolled down the page by {amount}'
 			logger.info(msg)
@@ -432,7 +446,9 @@ class Controller(Generic[Context]):
 				await page.evaluate(f'window.scrollBy(0, -{params.amount});')
 			else:
 				await page.evaluate('window.scrollBy(0, -window.innerHeight);')
-
+			viewport = page.viewport_size
+			selenium_code = selenium_snippets.scroll_up(params.amount, viewport=viewport)
+			self._save_selenium_code(selenium_code)
 			amount = f'{params.amount} pixels' if params.amount is not None else 'one page'
 			msg = f'🔍  Scrolled up the page by {amount}'
 			logger.info(msg)
@@ -462,6 +478,8 @@ class Controller(Generic[Context]):
 							raise e
 				else:
 					raise e
+			selenium_code = selenium_snippets.send_keys(params.keys)
+			self._save_selenium_code(selenium_code)
 			msg = f'⌨️  Sent keys: {params.keys}'
 			logger.info(msg)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
@@ -491,7 +509,8 @@ class Controller(Generic[Context]):
 					except Exception as e:
 						logger.debug(f'Locator attempt failed: {str(e)}')
 						continue
-
+				selenium_code = selenium_snippets.scroll_to_text(text)
+				self._save_selenium_code(selenium_code)
 				msg = f"Text '{text}' not found or not visible on page"
 				logger.info(msg)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
@@ -648,7 +667,8 @@ class Controller(Generic[Context]):
 
 							msg = f'selected option {text} with value {selected_option_values}'
 							logger.info(msg + f' in frame {frame_index}')
-
+							selenium_code = selenium_snippets.select_dropdown_option(dom_element.xpath, text)
+							self._save_selenium_code(selenium_code)
 							return ActionResult(extracted_content=msg, include_in_memory=True)
 
 					except Exception as frame_e:

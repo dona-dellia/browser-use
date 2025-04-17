@@ -29,13 +29,6 @@ def wait_to_element(css_element: str, timeout: int)-> str:
         EC.visibility_of_element_located((By.CSS_SELECTOR, "{css_element}"))
         """
     return selenium_code
- 
-def click_by_index(element_xpath: str)-> str:
-    selenium_code = f"""
-element_to_click = driver.find_element(By.XPATH, '{element_xpath}')
-element_to_click.click()
-"""
-    return selenium_code
 
 def click_by_selector(css_selector:str)-> str:
     selenium_code = f"""
@@ -53,13 +46,30 @@ element_to_click.click()
 
 def click_by_text(text:str)-> str:
     selenium_code = f"""
-driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+element = driver.find_element(By.XPATH, "//*[contains(text(), '{text}')]")
+driver.execute_script("arguments[0].scrollIntoView({{block: 'center'}});", element)
 element.click()
+"""
+    return selenium_code
+
+
+def click_by_selector_selector_js(css_selector: str)-> str:
+    selenium_code = f"""
+element_to_click = driver.find_element(By.CSS_SELECTOR, '{css_selector}')
+element_to_click.click()
+"""
+    return selenium_code
+
+def click_by_selector_xpath_js(xpath: str)-> str:
+    selenium_code = f"""
+element_to_click = driver.find_element(By.XPATH, '{xpath}')
+element_to_click.click()
 """
     return selenium_code
 
 def click_by_text_js(text:str)-> str:
     selenium_code = f"""
+element = driver.find_element(By.XPATH, "//*[contains(text(), '{text}')]")
 driver.execute_script("arguments[0].click();", element)
 """
     return selenium_code
