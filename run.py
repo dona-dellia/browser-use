@@ -50,7 +50,7 @@ llm= ChatOpenAI(
 agent = Agent(
 		task=(
 			"""
-   go to google, search about dell, open the last page about it in another tab, and clode the google tab
+   GIVEN the user is on the Change Objects landing page and has the necessary permissions to view and search for change objects, WHEN they select the 'STATUS' field in the search form and choose 'BF' as a search criterion, THEN the 'BF' status should be available as a search option in the 'Status' multiple selection field, and the search results should display all change objects with a status of 'BF' after clicking the 'GO' button.
    """),
 		llm=llm,
 		use_vision=False,
@@ -61,6 +61,7 @@ agent = Agent(
         #planner_llm=llm,
         #planner_interval=1,
 		controller=controller,
+        generate_gif=True,
 		sensitive_data=sensitive_data,
         message_context=glossary,
 	)

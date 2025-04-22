@@ -315,6 +315,9 @@ class Controller(Generic[Context]):
 			await page.pdf(path=sanitized_filename, format='A4', print_background=False)
 			msg = f'Saving page with URL {page.url} as PDF to ./{sanitized_filename}'
 			logger.info(msg)
+   
+			selenium_code = selenium_snippets.save_pdf(page.url)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Tab Management Actions
@@ -347,6 +350,8 @@ class Controller(Generic[Context]):
 			await page.close()
 			msg = f'❌  Closed tab #{params.page_id} with url {url}'
 			logger.info(msg)
+			selenium_code = selenium_snippets.close_tab(params.page_id)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Content Actions
@@ -408,6 +413,8 @@ class Controller(Generic[Context]):
 				msg = f'Saved HTML content of page with URL {page.url} to ./{sanitized_filename}'
 
 				logger.info(msg)
+				selenium_code = selenium_snippets.save_html_to_file()
+				self._save_selenium_code(selenium_code)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				error_msg = f'Failed to save HTML content: {str(e)}'
@@ -765,7 +772,6 @@ class Controller(Generic[Context]):
 							)
 				except Exception as e:
 					logger.error(f'Error getting element coordinates: {str(e)}')
-
 				return source_coords, target_coords
 
 			async def execute_drag_operation(

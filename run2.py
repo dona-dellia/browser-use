@@ -25,7 +25,7 @@ vdi_api_key: str = os.getenv("VDI_API_KEY") # type: ignore
 
 llm= ChatOpenAI(
         base_url="https://genai-api-dev.dell.com/v1",
-        model="llama-3-2-11b-vision-instruct",
+        model="llama-3-3-70b-instruct",
         api_key=SecretStr(vdi_api_key),
         http_async_client=httpx.AsyncClient(verify=False),
         
@@ -34,8 +34,9 @@ llm= ChatOpenAI(
 
 initial_actions = [
 	{'open_tab': {'url': 'https://real-estate-management.netlify.app/user/signin'}},
-	{"input_text":{"index":4,"text":"test@email.com"}},
-	{"input_text":{"index":6,"text":"password"}},
+	{"input_text":{"index":35,"text":"test@email.com"}},
+	{"input_text":{"index":36,"text":"password"}},
+    {"click_element_by_index":{"index":37}},
 ]
 
 agent = Agent(
@@ -52,7 +53,6 @@ agent = Agent(
 		use_vision=True
   ,
 		max_failures=10,
-  save_conversation_path="./",
         initial_actions=initial_actions,
         generate_gif=True,
 		validate_output=False,

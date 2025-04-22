@@ -96,3 +96,7 @@ Waiting-Deviation</div>
 ```
 13. dropdowns select all options as default
 After clicked in a dropdown, before select the desire element, click element "select all" element
+
+14. If If there is any acronym or abbreviation, you should ask a human whether that acronym has any meaning or if it is correct as it is.  
+
+15. If there is a need to input some information, and this information is not written in the task, you should ask the human how to fill in such information

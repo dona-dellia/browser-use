@@ -229,3 +229,71 @@ if not found_in_frame:
 """
 
     return selenium_code
+
+def save_pdf(url: str) -> str:
+    selenium_code = """# PDF da página atual
+from selenium.webdriver.chrome.options import Options
+import re
+
+current_url = driver.current_url
+short_url = re.sub(r'^https?://(?:www\.)?|/$', '', current_url)
+slug = re.sub(r'[^a-zA-Z0-9]+', '-', short_url).strip('-').lower()
+sanitized_filename = f'{slug}.pdf'
+
+print_options = {'path': sanitized_filename, 'format': 'A4', 'background': False}
+driver.execute_cdp_cmd('Page.printToPDF', print_options)
+"""
+    return selenium_code
+
+def close_tab(page_id: int) -> str:
+    selenium_code = f"""
+window_handles = driver.window_handles
+driver.switch_to.window(window_handles[{page_id}])
+url = driver.current_url
+driver.close()
+
+if len(window_handles) > 1:
+    driver.switch_to.window(window_handles[0])
+"""
+    return selenium_code
+
+def save_html_to_file() -> str:
+
+    selenium_code = """# Salvar HTML
+import re
+from datetime import datetime
+
+html_content = driver.page_source
+current_url = driver.current_url
+short_url = re.sub(r'^https?://(?:www\.)?|/$', '', current_url)
+slug = re.sub(r'[^a-zA-Z0-9]+', '-', short_url).strip('-').lower()[:64]
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+sanitized_filename = f'{slug}_{timestamp}.html'
+
+with open(sanitized_filename, 'w', encoding='utf-8') as f:
+    f.write(html_content)
+"""
+    return selenium_code
+
+def drag_and_drop_elements(source_id: str, target_id: str) -> str:
+
+    selenium_code = f"""
+from selenium.webdriver.common.action_chains import ActionChains
+
+source = driver.find_element(By.ID, '{source_id}')
+target = driver.find_element(By.ID, '{target_id}')
+
+ActionChains(driver).drag_and_drop(source, target).perform()"""
+    return selenium_code
+
+def drag_and_drop_coords(start_x: int, start_y: int, end_x: int, end_y: int) -> str:
+    selenium_code = f"""
+from selenium.webdriver.common.action_chains import ActionChains
+
+actions = ActionChains(driver)
+actions.move_by_offset({start_x}, {start_y})
+actions.click_and_hold()
+actions.move_by_offset({end_x - start_x}, {end_y - start_y})
+actions.release()
+actions.perform()"""
+    return selenium_code
