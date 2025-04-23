@@ -647,20 +647,12 @@ class Agent(Generic[Context]):
 				raise ValueError('Could not parse response.')
 
 		elif True:
-			response_text = await self.llm.ainvoke(input_messages)
-			response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
-			response_text = self._remove_think_tags(response_text)
-			response_text = json.loads(response_text)
-			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
-				response_text = response_text["parameters"]
-			for action in response_text['action']:
-				if 'click_element' in action:
-					action['click_element_by_index'] = action.pop('click_element')
-			response_text = json.dumps(response_text)
-
-			parsed_json = extract_json_from_model_output(response_text)
-			print(f'parsed json: {parsed_json}')
-			parsed = self.AgentOutput(**parsed_json)
+			model_with_tools = self.llm.bind_tools([self.AgentOutput])
+			response_llm = await model_with_tools.ainvoke(input_messages)  # type: ignore
+			response_json = response_llm.to_json()
+			extracted_json = response_json['kwargs']['additional_kwargs']['tool_calls'][0]['function']['arguments'] # type: ignore
+			response_str = json.loads(extracted_json)
+			parsed = self.AgentOutput(**response_str)
 
 
 		else:
