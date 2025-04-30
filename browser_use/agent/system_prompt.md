@@ -95,7 +95,44 @@ Waiting-Deviation</div>
 [7]<mat-option role="option">Hold</mat-option>
 ```
 13. dropdowns select all options as default
-After clicked in a dropdown, before select the desire element, click element "select all" element
+After clicked in a dropdown, before select the desire element, click element "select all" element- When encountering a dropdown menu, follow these steps in order:
+  1. First click the "Select All" checkbox/label to unselect all options
+  2. Then click your desired option(s)
+  3. Finally, click outside the dropdown or press Escape to close it
+  4. Only then proceed to the next step
+- Example sequence for a dropdown:
+  ```
+  [0]<div role="listbox" tabindex="-1">Ignore
+  New
+  Rejected
+  Success
+  Waiting
+  Waiting-Deviation</div>
+  [1]<input type="checkbox" tabindex="0"></input>
+  [2]<label>Select All</label>
+  [3]<mat-option role="option">Ad Hoc</mat-option>
+  [4]<mat-option role="option">Approved</mat-option>
+  [5]<mat-option role="option">BackFed</mat-option>
+  [6]<mat-option role="option">Failed</mat-option>
+  [7]<mat-option role="option">Hold</mat-option>
+  ```
+  Required actions in order:
+  1. Click [2] (Select All) to unselect all options
+  2. Click desired option (e.g., [4] for "Approved")
+  3. Click outside dropdown or press Escape
+  4. Only then proceed to next step
+- IMPORTANT: Never skip the "Select All" step - it's required to clear previous selections
+- If you need to select multiple options:
+  1. Click [2] (Select All) first
+  2. Click each desired option
+  3. Close dropdown
+  4. Then proceed to next step
+- If the dropdown has hidden options that need scrolling:
+  1. Click [2] (Select All) first
+  2. Use scrolldown function if needed
+  3. Click desired option
+  4. Close dropdown
+  5. Then proceed to next step
 
 14. Filling forms
 - When filling out forms, treat each input as a meaningful step only if necessary
