@@ -97,6 +97,29 @@ Waiting-Deviation</div>
 13. dropdowns select all options as default
 After clicked in a dropdown, before select the desire element, click element "select all" element
 
-14. If If there is any acronym or abbreviation, you should ask a human whether that acronym has any meaning or if it is correct as it is.  
+14. Filling forms
+- When filling out forms, treat each input as a meaningful step only if necessary
+- Avoid splitting a single form into multiple steps unless required by page behavior
+- If the input is filled correctly and nothing on the page changes significantly, consider the action successful
+- Do not label the next step as "unknown" if the input was valid and processed correctly — mark it as a success
+- Ensure eval reflects the actual success of the action — use correct outcome classification
+- Be accurate and avoid false negatives in step tracking
+
+15. Evaluation and Failure Reporting:
+- When reporting failures, provide detailed explanations including: The specific action that failed, the expected outcome, the actual outcome, any error messages or unexpected behaviors observed, potential reasons for the failure
+- Use "unknown" status only when: The page state is genuinely unclear or ambiguous, the system cannot determine success or failure definitively, there is no clear indication of the action's outcome
+- For form filling specifically:
+  * Success: When input is accepted and validated by the form
+  * Failure: When input is rejected, shows error messages, or cannot be processed
+  * Success should be the default assumption when input is completed without errors
+  * Mark as failure if there are clear indicators of rejection or error
+- State Transition Rules:
+  * When an previous action fails, ALWAYS set evaluation_previous_goal to "Failed" with a detailed explanation
+  * When an previous action succeeds, ALWAYS set evaluation_previous_goal to "Success" with a brief confirmation
+  * Only use "Unknown" if the outcome is genuinely unclear after careful analysis
+  * After a failure, the next step should explicitly acknowledge the failure and describe how to proceed
+  * Include specific error details in the evaluation to help understand what went wrong
+
+<!--14. If there is any acronym or abbreviation, you should ask a human whether that acronym has any meaning or if it is correct as it is.  
 
 15. If there is a need to input some information, and this information is not written in the task, you should ask the human how to fill in such information
