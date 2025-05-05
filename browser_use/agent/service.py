@@ -653,7 +653,6 @@ class Agent(Generic[Context]):
 			response_json = response_llm.to_json()
 			extracted_json = response_json['kwargs']['additional_kwargs']['tool_calls'][0]['function']['arguments'] # type: ignore
 			response_str = json.loads(extracted_json)
-			print(response_str)
 			parsed = self.AgentOutput(**response_str)
 
 
