@@ -156,6 +156,7 @@ class Agent(Generic[Context]):
 			page_extraction_llm = llm
 
 		# Core components
+		self.fail_or_unkown = 0
 		self.task = task
 		self.llm = llm
 		self.controller = controller
@@ -209,7 +210,7 @@ class Agent(Generic[Context]):
 			raise ValueError('Environment variables not set')
 
 		# Start non-blocking LLM connection verification
-		self.llm._verified_api_keys = self._verify_llm_connection(self.llm)
+		#self.llm._verified_api_keys = self._verify_llm_connection(self.llm)
 
 		# Initialize available actions for system prompt (only non-filtered actions)
 		# These will be used for the system prompt to maintain caching
@@ -484,7 +485,6 @@ class Agent(Generic[Context]):
 				raise e
 
 			result: list[ActionResult] = await self.multi_act(model_output.action)
-
 			self.state.last_result = result
 
 			if len(result) > 0 and result[-1].is_done:
@@ -539,6 +539,7 @@ class Agent(Generic[Context]):
 		include_trace = logger.isEnabledFor(logging.DEBUG)
 		error_msg = AgentError.format_error(error, include_trace=include_trace)
 		prefix = f'❌ Result failed {self.state.consecutive_failures + 1}/{self.settings.max_failures} times:\n '
+		self.fail_or_unkown += 1
 
 		if 'Browser closed' in error_msg:
 			logger.error('❌  Browser is closed or disconnected, unable to proceed')
@@ -652,6 +653,7 @@ class Agent(Generic[Context]):
 			response_json = response_llm.to_json()
 			extracted_json = response_json['kwargs']['additional_kwargs']['tool_calls'][0]['function']['arguments'] # type: ignore
 			response_str = json.loads(extracted_json)
+			print(response_str)
 			parsed = self.AgentOutput(**response_str)
 
 
@@ -659,7 +661,8 @@ class Agent(Generic[Context]):
 			logger.debug(f'Using {self.tool_calling_method} for {self.chat_model_library}')
 			structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True, method=self.tool_calling_method)
 			response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
-
+		self.fail_or_unkown += 1 if "Success" not in parsed.current_state.evaluation_previous_goal else 0
+		log_response(parsed)
 		return parsed
 
 	def _log_agent_run(self) -> None:
@@ -723,7 +726,7 @@ class Agent(Generic[Context]):
 		signal_handler.register()
 
 		# Start non-blocking LLM connection verification
-		assert self.llm._verified_api_keys, 'Failed to verify LLM API keys'
+		#assert self.llm._verified_api_keys, 'Failed to verify LLM API keys'
 
 		try:
 			self._log_agent_run()
