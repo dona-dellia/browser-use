@@ -967,8 +967,6 @@ class Controller(Generic[Context]):
 		except Exception as e:
 			raise e
 	def _save_selenium_code(self, selenium_action: str, overwrite: bool = False) -> None:
-		print(f"Saving Selenium code to: {self.save_selenium_code}")
-		print(f"File path: {self.save_selenium_code}{self.save_py}.py")
 
 		"""Create directory and save Selenium action to a separate code file if path is specified"""
 		if not self.save_selenium_code:

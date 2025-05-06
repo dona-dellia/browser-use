@@ -20,20 +20,18 @@ from prism_configs.prism_prompts import glossary
 #informacoes pessoais
 password = os.getenv("PASSWORD")
 vdi_api_key: str = os.getenv("VDI_API_KEY") # type: ignore
-sensitive_data = {'x_name': "PEDRO_FERNANDES", 'x_password': password}
+sensitive_data = {'x_name': "JULIA_MENEZES", 'x_password': password}
       
 
 initial_actions = [
 	{'open_tab': {'url': 'https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home'}},
 	{"go_to_url":{"url":"https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home"}},
-	{"input_text":{"index":2,"text":"PEDRO_FERNANDES"}},
+	{"input_text":{"index":2,"text":"JULIA_MENEZES"}},
 	{"input_text":{"index":3,"text":password}},
 	{"click_element_by_index":{"index":5}}, 
 	
 ]
 
-
-#20 23
 llm= ChatOpenAI(
         base_url="https://genai-api-dev.dell.com/v1",
         model="llama-3-3-70b-instruct",
@@ -55,7 +53,7 @@ agent = Agent(
 		llm=llm,
 		use_vision=False,
 		max_failures=10,
-		#initial_actions=initial_actions,
+		initial_actions=initial_actions,
 		validate_output=False,
 		browser_context=context,
         #planner_llm=llm,
@@ -66,6 +64,15 @@ agent = Agent(
         message_context=glossary,
         enable_memory=True,
         memory_interval=1,
+                memory_config={
+            'vector_store': {
+                'provider': 'local',
+                'path': './memory_store'
+            },
+            'offline_mode': True,
+            'use_local_embeddings': True,
+            'local_embeddings_model': 'gte-large'
+        }
 	)
 async def main():
 

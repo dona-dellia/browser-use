@@ -44,10 +44,10 @@ async def scroll_down_element(pixels: int, index: int, browser: BrowserContext) 
         logger.error(error_msg)
         return ActionResult(error=error_msg, include_in_memory=True)
 
-@controller.action('Ask user for information about acronyms meaning, inputs, or points in the specification that were not clear ')
-def ask_human(question: str) -> ActionResult:
-    answer = input(f'\n{question}\nInput: ')
-    return ActionResult(extracted_content=answer)
+#@controller.action('Ask user for information about acronyms meaning, inputs, or points in the specification that were not clear ')
+#def ask_human(question: str) -> ActionResult:
+#    answer = input(f'\n{question}\nInput: ')
+#    return ActionResult(extracted_content=answer)
    
 @controller.action(
     description='Scroll up a specific element by a number of pixels using its index in the selector map.',
