@@ -56,14 +56,14 @@ class Controller(Generic[Context]):
 	):
 		if not save_py:
 			save_py = "output"
-
 		self.save_py = save_py
-		self.save_selenium_code = save_selenium_code
 
+		self.save_selenium_code = save_selenium_code
 		if self.save_selenium_code and '/' not in self.save_selenium_code:
 			self.save_selenium_code = f'{self.save_selenium_code}/'
 
 		self._save_selenium_code(selenium_snippets.initial_selenium_code, overwrite=True)
+
 		self.registry = Registry[Context](exclude_actions)
 
 		"""Register all default browser actions"""
@@ -967,11 +967,16 @@ class Controller(Generic[Context]):
 		except Exception as e:
 			raise e
 	def _save_selenium_code(self, selenium_action: str, overwrite: bool = False) -> None:
+		print(f"Saving Selenium code to: {self.save_selenium_code}")
+		print(f"File path: {self.save_selenium_code}{self.save_py}.py")
+
 		"""Create directory and save Selenium action to a separate code file if path is specified"""
 		if not self.save_selenium_code:
-			return 
-		os.makedirs(os.path.dirname(self.save_selenium_code), exist_ok=True)        # Save the Selenium action to a dedicated .py file per action
+			return
+
+		os.makedirs(self.save_selenium_code, exist_ok=True)
 		file_path = f"{self.save_selenium_code}{self.save_py}.py"
 
 		with open(file_path, 'w' if overwrite else 'a', encoding='utf-8') as f:
 			f.write(selenium_action + '\n')
+
