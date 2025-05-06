@@ -2,6 +2,8 @@ import asyncio
 import json
 import enum
 import logging
+import os
+import browser_use.controller.selenium_snippets as selenium_snippets
 from typing import Dict, Generic, Optional, Type, TypeVar, Callable
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -45,7 +47,21 @@ class Controller(Generic[Context]):
 		self,
 		exclude_actions: list[str] = [],
 		output_model: Optional[Type[BaseModel]] = None,
+  		save_selenium_code: Optional[str] = None,
+		save_py: Optional[str] = None,
 	):
+		if not save_py:
+			save_py = "output"
+
+		self.save_py = save_py
+		self.save_selenium_code = save_selenium_code
+
+		if self.save_selenium_code and '/' not in self.save_selenium_code:
+			self.save_selenium_code = f'{self.save_selenium_code}/'
+   
+		self._save_selenium_code(selenium_snippets.initial_selenium_code, overwrite=True)
+		self.exclude_actions = exclude_actions
+		self.output_model = output_model
 		self.registry = Registry(exclude_actions)
 
 		"""Register all default browser actions"""
@@ -99,6 +115,9 @@ class Controller(Generic[Context]):
 			await asyncio.sleep(browser.config.minimum_wait_page_load_time)
 			msg = f'🔗  Navigated to {params.url}'
 			logger.info(msg)
+   
+			selenium_code = selenium_snippets.go_to(params.url)	
+			self._save_selenium_code(selenium_code)   
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Go back', param_model=NoParamsAction)
@@ -108,6 +127,9 @@ class Controller(Generic[Context]):
 			await asyncio.sleep(browser.config.minimum_wait_page_load_time)
 			msg = '🔙  Navigated back'
 			logger.info(msg)
+   
+			selenium_code = selenium_snippets.back()
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# wait for x seconds
@@ -116,6 +138,9 @@ class Controller(Generic[Context]):
 			msg = f'🕒  Waiting for {seconds} seconds'
 			logger.info(msg)
 			await asyncio.sleep(seconds)
+   
+			selenium_code = selenium_snippets.sleep(seconds)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Element Interaction Actions
@@ -147,6 +172,8 @@ class Controller(Generic[Context]):
 					msg = f'💾  Downloaded file to {download_path}'
 				else:
 					msg = f'🖱️  Clicked button with index {params.index}: {element_node.get_all_text_till_next_clickable_element(max_depth=2)}'
+				selenium_code = selenium_snippets.click(element_node.xpath)
+				self._save_selenium_code(selenium_code)
 
 				logger.info(msg)
 				logger.debug(f'Element xpath: {element_node.xpath}')
@@ -156,6 +183,8 @@ class Controller(Generic[Context]):
 					msg += f' - {new_tab_msg}'
 					logger.info(new_tab_msg)
 					await browser.switch_to_tab(-1)
+					selenium_code = selenium_snippets.switch_to_tab(-1)
+					self._save_selenium_code(selenium_code)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
 			except Exception as e:
 				logger.warning(f'Element not clickable with index {params.index} - most likely the page changed')
@@ -180,6 +209,9 @@ class Controller(Generic[Context]):
 				msg = f'⌨️  Input sensitive data into index {params.index}'
 			logger.info(msg)
 			logger.debug(f'Element xpath: {element_node.xpath}')
+
+			selenium_code = selenium_snippets.input_txt(element_node.xpath, params.text)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Tab Management Actions
@@ -189,6 +221,8 @@ class Controller(Generic[Context]):
 			await asyncio.sleep(browser.config.minimum_wait_page_load_time)
 			msg = f'🔄  Switched to tab {params.page_id}'
 			logger.info(msg)
+			selenium_code = selenium_snippets.switch_to_tab(params.page_id)	
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Open url in new tab', param_model=OpenTabAction)
@@ -196,6 +230,8 @@ class Controller(Generic[Context]):
 			await browser.create_new_tab(params.url)
 			msg = f'🔗  Opened new tab with {params.url}'
 			logger.info(msg)
+			selenium_code = selenium_snippets.open_tab(params.url)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Content Actions
@@ -231,6 +267,8 @@ class Controller(Generic[Context]):
 				driver.execute_script(f'window.scrollBy(0, {params.amount});')
 			else:
 				driver.execute_script('window.scrollBy(0, window.innerHeight);')
+			selenium_code = selenium_snippets.scroll_down(params.amount)
+			self._save_selenium_code(selenium_code)
 
 			amount = f'{params.amount} pixels' if params.amount is not None else 'one page'
 			msg = f'🔍  Scrolled down the page by {amount}'
@@ -255,6 +293,9 @@ class Controller(Generic[Context]):
 			amount = f'{params.amount} pixels' if params.amount is not None else 'one page'
 			msg = f'🔍  Scrolled up the page by {amount}'
 			logger.info(msg)
+   
+			selenium_code = selenium_snippets.scroll_up(params.amount)
+			self._save_selenium_code(selenium_code)
 			return ActionResult(
 				extracted_content=msg,
 				include_in_memory=True,
@@ -337,6 +378,9 @@ class Controller(Generic[Context]):
 				raise e
 				
 			msg = f'⌨️  Sent keys: {params.keys}'
+
+			selenium_code = selenium_snippets.send_keys(params.keys)
+			self._save_selenium_code(selenium_code)
 			logger.info(msg)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
@@ -363,6 +407,8 @@ class Controller(Generic[Context]):
 							await asyncio.sleep(0.5)  # Wait for scroll to complete
 							msg = f'🔍  Scrolled to text: {text}'
 							logger.info(msg)
+							selenium_code = selenium_snippets.scroll_to_text(text)
+							self._save_selenium_code(selenium_code)
 							return ActionResult(extracted_content=msg, include_in_memory=True)
 					except Exception as e:
 						logger.debug(f'Locator attempt failed: {str(e)}')
@@ -499,6 +545,9 @@ class Controller(Generic[Context]):
 				
 				msg = f"Selected option '{text}' from dropdown at index {index}"
 				logger.info(msg)
+    
+				selenium_code = selenium_snippets.select_dropdown_option(dom_element.xpath, text)
+				self._save_selenium_code(selenium_code)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
 				
 			except Exception as e:
@@ -594,3 +643,13 @@ class Controller(Generic[Context]):
 			return ActionResult()
 		except Exception as e:
 			raise e
+
+	def _save_selenium_code(self, selenium_action: str, overwrite: bool = False) -> None:
+		"""Create directory and save Selenium action to a separate code file if path is specified"""
+		if not self.save_selenium_code:
+			return 
+		os.makedirs(os.path.dirname(self.save_selenium_code), exist_ok=True)        # Save the Selenium action to a dedicated .py file per action
+		file_path = f"{self.save_selenium_code}{self.save_py}.py"
+
+		with open(file_path, 'w' if overwrite else 'a', encoding='utf-8') as f:
+			f.write(selenium_action + '\n')
