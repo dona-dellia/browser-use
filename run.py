@@ -82,13 +82,13 @@ context = BrowserContext(browser=browser, config=config)
 #informacoes pessoais
 password = os.getenv("PASSWORD")
 vdi_api_key: str = os.getenv("VDI_API_KEY") # type: ignore
-sensitive_data = {'x_name': "R_RODRIGUES", 'x_password': password}
+sensitive_data = {'x_name': "JULIA_MENEZES", 'x_password': password}
 
 
 initial_actions = [
 	{'open_tab': {'url': 'https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home'}},
 	{"go_to_url":{"url":"https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home"}},
-	{"input_text":{"index":2,"text":"R_RODRIGUES"}},
+	{"input_text":{"index":2,"text":"JULIA_MENEZES"}},
 	{"input_text":{"index":4,"text":password}},
 	{"click_element":{"index":6}},
 	
@@ -118,8 +118,8 @@ agent = Agent(
 		browser_context=context,
 		controller=controller,
 		sensitive_data=sensitive_data,
-        save_conversation_path="C:\\Users\\R_RODRIGUES\\Documents\\projetos\\browser-use\\logs",
-        selenium_code_file_name="teste"
+        save_conversation_path="C:\\Users\\JULIA_MENEZES\\Documents\\projetos\\browser-use\\logs",
+        selenium_code_file_name="sensitive"
         
         
 	)

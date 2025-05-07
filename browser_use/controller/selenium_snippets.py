@@ -26,10 +26,16 @@ element_to_click.click()
 """
     return selenium_code
 
-def input_txt(element_xpath: str, text: str) -> str:
+
+def input_txt(element_xpath: str, text: str, is_sensitive: bool) -> str:
+    if is_sensitive:
+        text_value = "Replace with your sensitive data"
+        
+    else:
+        text_value = f'"{text}"'
     selenium_code = f"""
 element_to_input = driver.find_element(By.XPATH, '{element_xpath}')
-element_to_input.send_keys("{text}")
+element_to_input.send_keys({text_value})
 """
     return selenium_code
 

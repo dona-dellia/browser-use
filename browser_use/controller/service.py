@@ -205,13 +205,15 @@ class Controller(Generic[Context]):
 			await browser._input_text_element_node(element_node, params.text)
 			if not has_sensitive_data:
 				msg = f'⌨️  Input {params.text} into index {params.index}'
+				selenium_code = selenium_snippets.input_txt(element_node.xpath, params.text, has_sensitive_data)
+				self._save_selenium_code(selenium_code)				
 			else:
 				msg = f'⌨️  Input sensitive data into index {params.index}'
+				selenium_code = selenium_snippets.input_txt(element_node.xpath, params.text, has_sensitive_data)
+				self._save_selenium_code(selenium_code)
 			logger.info(msg)
 			logger.debug(f'Element xpath: {element_node.xpath}')
 
-			selenium_code = selenium_snippets.input_txt(element_node.xpath, params.text)
-			self._save_selenium_code(selenium_code)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		# Tab Management Actions
