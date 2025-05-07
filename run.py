@@ -22,7 +22,7 @@ from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
 #controle
-controller = Controller(exclude_actions=['search_google'], save_py="code", save_selenium_code="output/")
+controller = Controller(exclude_actions=['search_google'])
 
 @controller.action('Assert content of a page based on the description and the html')
 async def assert_content(
@@ -70,7 +70,7 @@ async def assert_content(
 def uncertainty_handling(answer: str) -> ActionResult:
     return ActionResult(extracted_content=answer)
 
-controller = Controller(exclude_actions=['search_google'], save_py="code", save_selenium_code="output/")
+controller = Controller(exclude_actions=['search_google'])
 
 
 #browser
@@ -118,7 +118,10 @@ agent = Agent(
 		browser_context=context,
 		controller=controller,
 		sensitive_data=sensitive_data,
-        save_conversation_path="C:\\Users\\R_RODRIGES\\Documents\\projetos\\browser-use\\logs"
+        save_conversation_path="C:\\Users\\R_RODRIGUES\\Documents\\projetos\\browser-use\\logs",
+        selenium_code_file_name="teste"
+        
+        
 	)
 async def main():
 

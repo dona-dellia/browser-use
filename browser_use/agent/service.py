@@ -13,6 +13,8 @@ import uuid
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+import browser_use.controller.selenium_snippets as selenium_snippets
+
 
 from dotenv import load_dotenv
 from google.api_core.exceptions import ResourceExhausted
@@ -81,6 +83,8 @@ class Agent:
 		message_context: Optional[str] = None,
 		generate_gif: bool | str = True,
 		sensitive_data: Optional[Dict[str, str]] = None,
+  		selenium_code_file_path:Optional[str] = None,
+        selenium_code_file_name:Optional[str] = None,
 		include_attributes: list[str] = [
 			'title',
 			'type',
@@ -130,6 +134,14 @@ class Agent:
 		# Controller setup
 		self.controller = controller
 		self.max_actions_per_step = max_actions_per_step
+		# Controller Selenium Setup
+		self.selenium_code_file_name = selenium_code_file_name
+		self.selenium_code_file_path = selenium_code_file_path
+  
+		if self.selenium_code_file_path or self.selenium_code_file_name:
+			self.controller.save_py = self.selenium_code_file_name or "output"
+			self.controller.save_selenium_code = self.selenium_code_file_path or "output/"
+		self.controller._save_selenium_code(selenium_snippets.initial_selenium_code, overwrite=True)
 
 		# Browser setup
 		self.injected_browser = browser is not None
