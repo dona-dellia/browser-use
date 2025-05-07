@@ -10,6 +10,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, TypeVar, Union
+import browser_use.controller.selenium_snippets as selenium_snippets
 
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -125,6 +126,8 @@ class Agent(Generic[Context]):
 		message_context: Optional[str] = None,
 		generate_gif: bool | str = False,
 		available_file_paths: Optional[list[str]] = None,
+  		selenium_code_file_path:Optional[str] = None,
+        selenium_code_file_name:Optional[str] = None,
 		include_attributes: list[str] = [
 			'title',
 			'type',
@@ -270,6 +273,16 @@ class Agent(Generic[Context]):
 
 		# Context
 		self.context = context
+
+		#Controller
+		self.selenium_code_file_name = selenium_code_file_name
+		self.selenium_code_file_path = selenium_code_file_path
+  
+		if self.selenium_code_file_path or self.selenium_code_file_name:
+			self.controller.save_py = self.selenium_code_file_name or "output"
+			self.controller.save_selenium_code = self.selenium_code_file_path or "output/"
+		self.controller._save_selenium_code(selenium_snippets.initial_selenium_code, overwrite=True)
+
 
 		# Telemetry
 		self.telemetry = ProductTelemetry()

@@ -3,7 +3,7 @@ from browser_use.browser.context import BrowserContext
 import logging
 logger = logging.getLogger(__name__)
 
-controller = Controller(exclude_actions=['search_google','get_dropdown_options','select_dropdown_option','scroll_down','scroll_to_text','scroll_up'], save_py="code", save_selenium_code="output/")
+controller = Controller(exclude_actions=['search_google','get_dropdown_options','select_dropdown_option','scroll_down','scroll_to_text','scroll_up'])
 
 @controller.action(
     description='Scroll down a specific element by a number of pixels using its index in the selector map.',

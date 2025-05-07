@@ -66,6 +66,7 @@ agent = Agent(
         generate_gif=True,
 		sensitive_data=sensitive_data,
         message_context=glossary,
+        selenium_code_file_name="sensitive",
 	)
 async def start_step_hook(agent: Agent):
     if agent.fail_or_unkown >= 3:
