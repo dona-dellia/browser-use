@@ -33,15 +33,19 @@ element_to_click = driver.find_element(By.XPATH, 'html/body/app-root/app-prism-h
 element_to_click.click()
 
 
-element_to_click = driver.find_element(By.XPATH, 'html/body/app-root/app-prism-header/div/div[2]/div/app-coparent/app-cohome/div/form/div/div[2]/div/div[3]/mat-form-field/div/div[2]/div/label/mat-label')
+element_to_click = driver.find_element(By.XPATH, 'html/body/app-root/app-prism-header/div/div[2]/div/app-coparent/app-cohome/div/form/div/div[2]/div/div[3]/mat-form-field/div/div[2]/div/mat-select')
 element_to_click.click()
 
 
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[3]/span')
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[2]')
 element_to_click.click()
 
 
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div')
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[2]')
+element_to_click.click()
+
+
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option')
 element_to_click.click()
 
 
@@ -49,10 +53,6 @@ element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/di
 element_to_click.click()
 
 
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/app-multiselect/mat-checkbox/div/label')
-element_to_click.click()
-
-
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/app-multiselect/mat-checkbox')
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[2]')
 element_to_click.click()
 

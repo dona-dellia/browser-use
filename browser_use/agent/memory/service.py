@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+import os
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -9,22 +9,13 @@ from langchain_core.messages import (
 	HumanMessage,
 )
 from langchain_core.messages.utils import convert_to_openai_messages
-from mem0 import Memory as Mem0Memory
-from pydantic import BaseModel
 
+from browser_use.agent.memory.views import MemoryConfig
 from browser_use.agent.message_manager.service import MessageManager
 from browser_use.agent.message_manager.views import ManagedMessage, MessageMetadata
 from browser_use.utils import time_execution_sync
 
 logger = logging.getLogger(__name__)
-
-
-class MemorySettings(BaseModel):
-	"""Settings for procedural memory."""
-
-	agent_id: str
-	interval: int = 10
-	config: Optional[dict] | None = None
 
 
 class Memory:
@@ -41,13 +32,54 @@ class Memory:
 		self,
 		message_manager: MessageManager,
 		llm: BaseChatModel,
-		settings: MemorySettings,
+		config: MemoryConfig | None = None,
 	):
 		self.message_manager = message_manager
 		self.llm = llm
-		self.settings = settings
-		self._memory_config = self.settings.config or {'vector_store': {'provider': 'faiss'}}
-		self.mem0 = Mem0Memory.from_config(config_dict=self._memory_config)
+
+		# Initialize configuration with defaults based on the LLM if not provided
+		if config is None:
+			self.config = MemoryConfig(llm_instance=llm, agent_id=f'agent_{id(self)}')
+
+			# Set appropriate embedder based on LLM type
+			llm_class = llm.__class__.__name__
+			if llm_class == 'ChatOpenAI':
+				self.config.embedder_provider = 'openai'
+				self.config.embedder_model = 'text-embedding-3-small'
+				self.config.embedder_dims = 1536
+			elif llm_class == 'ChatGoogleGenerativeAI':
+				self.config.embedder_provider = 'gemini'
+				self.config.embedder_model = 'models/text-embedding-004'
+				self.config.embedder_dims = 768
+			elif llm_class == 'ChatOllama':
+				self.config.embedder_provider = 'ollama'
+				self.config.embedder_model = 'nomic-embed-text'
+				self.config.embedder_dims = 512
+		else:
+			# Ensure LLM instance is set in the config
+			self.config = MemoryConfig(config)  # re-validate user-provided config
+			self.config.llm_instance = llm
+
+		# Check for required packages
+		try:
+			# also disable mem0's telemetry when ANONYMIZED_TELEMETRY=False
+			if os.getenv('ANONYMIZED_TELEMETRY', 'true').lower()[0] in 'fn0':
+				os.environ['MEM0_TELEMETRY'] = 'False'
+			from mem0 import Memory as Mem0Memory
+		except ImportError:
+			raise ImportError('mem0 is required when enable_memory=True. Please install it with `pip install mem0`.')
+
+		if self.config.embedder_provider == 'huggingface':
+			try:
+				# check that required package is installed if huggingface is used
+				from sentence_transformers import SentenceTransformer  # noqa: F401
+			except ImportError:
+				raise ImportError(
+					'sentence_transformers is required when enable_memory=True and embedder_provider="huggingface". Please install it with `pip install sentence-transformers`.'
+				)
+
+		# Initialize Mem0 with the configuration
+		self.mem0 = Mem0Memory.from_config(config_dict=self.config.full_config_dict)
 
 	@time_execution_sync('--create_procedural_memory')
 	def create_procedural_memory(self, current_step: int) -> None:
@@ -62,58 +94,59 @@ class Memory:
 		# Get all messages
 		all_messages = self.message_manager.state.history.messages
 
-		# Filter out messages that are marked as memory in metadata
-		messages_to_process = []
+		# Separate messages into those to keep as-is and those to process for memory
 		new_messages = []
+		messages_to_process = []
+
 		for msg in all_messages:
-			# Exclude system message and initial messages
-			if isinstance(msg, ManagedMessage) and msg.metadata.message_type in set(['init', 'memory']):
+			if isinstance(msg, ManagedMessage) and msg.metadata.message_type in {'init', 'memory'}:
+				# Keep system and memory messages as they are
 				new_messages.append(msg)
 			else:
-				messages_to_process.append(msg)
+				if len(msg.message.content) > 0:
+					messages_to_process.append(msg)
 
+		# Need at least 2 messages to create a meaningful summary
 		if len(messages_to_process) <= 1:
 			logger.info('Not enough non-memory messages to summarize')
 			return
+		# Create a procedural memory
+		memory_content = self._create([m.message for m in messages_to_process], current_step)
 
-		# Create a summary
-		summary = self._create([m.message for m in messages_to_process], current_step)
-
-		if not summary:
-			logger.warning('Failed to create summary')
+		if not memory_content:
+			logger.warning('Failed to create procedural memory')
 			return
 
-		# Replace the summarized messages with the summary
-		summary_message = HumanMessage(content=summary)
-		summary_tokens = self.message_manager._count_tokens(summary_message)
-		summary_metadata = MessageMetadata(tokens=summary_tokens, message_type='memory')
+		# Replace the processed messages with the consolidated memory
+		memory_message = HumanMessage(content=memory_content)
+		memory_tokens = self.message_manager._count_tokens(memory_message)
+		memory_metadata = MessageMetadata(tokens=memory_tokens, message_type='memory')
 
 		# Calculate the total tokens being removed
 		removed_tokens = sum(m.metadata.tokens for m in messages_to_process)
 
-		# Add the summary message
-		new_messages.append(ManagedMessage(message=summary_message, metadata=summary_metadata))
+		# Add the memory message
+		new_messages.append(ManagedMessage(message=memory_message, metadata=memory_metadata))
 
 		# Update the history
 		self.message_manager.state.history.messages = new_messages
 		self.message_manager.state.history.current_tokens -= removed_tokens
-		self.message_manager.state.history.current_tokens += summary_tokens
+		self.message_manager.state.history.current_tokens += memory_tokens
+		logger.info(f'Messages consolidated: {len(messages_to_process)} messages converted to procedural memory')
 
-		logger.info(f'Memories summarized: {len(messages_to_process)} messages converted to procedural memory')
-		logger.info(f'Token reduction: {removed_tokens - summary_tokens} tokens')
-
-	def _create(self, messages: List[BaseMessage], current_step: int) -> Optional[str]:
+	def _create(self, messages: list[BaseMessage], current_step: int) -> str | None:
 		parsed_messages = convert_to_openai_messages(messages)
 		try:
 			results = self.mem0.add(
 				messages=parsed_messages,
-				agent_id=self.settings.agent_id,
-				llm=self.llm,
+				agent_id=self.config.agent_id,
 				memory_type='procedural_memory',
 				metadata={'step': current_step},
 			)
-			if len(results.get('results', [])):
-				return results.get('results', [])[0].get('memory')
+			if isinstance(results, dict) and 'results' in results and len(results['results']) > 0:
+				memory_result = results['results'][0]
+				if isinstance(memory_result, dict) and 'memory' in memory_result:
+					return memory_result['memory']
 			return None
 		except Exception as e:
 			logger.error(f'Error creating procedural memory: {e}')
