@@ -37,15 +37,7 @@ element_to_click = driver.find_element(By.XPATH, 'html/body/app-root/app-prism-h
 element_to_click.click()
 
 
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[2]')
-element_to_click.click()
-
-
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[2]')
-element_to_click.click()
-
-
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option')
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[5]/span')
 element_to_click.click()
 
 
@@ -53,6 +45,27 @@ element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/di
 element_to_click.click()
 
 
-element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[2]')
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[11]')
 element_to_click.click()
+
+
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[11]/span')
+element_to_click.click()
+
+
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[6]')
+element_to_click.click()
+
+
+element_to_click = driver.find_element(By.XPATH, 'html/body/div[2]/div[2]/div/div/mat-option[3]/span')
+element_to_click.click()
+
+
+element = driver.find_element(By.XPATH, "//*[contains(text(), 'GO')]")
+driver.execute_script("arguments[0].click();", element)
+
+
+element = driver.find_element(By.XPATH, "//*[contains(text(), 'GO')]")
+driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+element.click()
 

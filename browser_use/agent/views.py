@@ -61,7 +61,7 @@ class AgentSettings(BaseModel):
 		'alt',
 		'aria-expanded',
 	]
-	max_actions_per_step: int = 10
+	max_actions_per_step: int = 2
 
 	tool_calling_method: Optional[ToolCallingMethod] = 'auto'
 	page_extraction_llm: Optional[BaseChatModel] = None
@@ -71,7 +71,7 @@ class AgentSettings(BaseModel):
 
 	# Procedural memory settings
 	enable_memory: bool = True
-	memory_interval: int = 10
+	memory_interval: int = 2
 	memory_config: Optional[dict] = None
 
 
