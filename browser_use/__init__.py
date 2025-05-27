@@ -9,7 +9,6 @@ from browser_use.agent.views import ActionResult as ActionResult
 from browser_use.agent.views import AgentHistoryList as AgentHistoryList
 from browser_use.browser.browser import Browser as Browser
 from browser_use.browser.browser import BrowserConfig as BrowserConfig
-from browser_use.browser.context import BrowserContextConfig
 from browser_use.controller.service import Controller as Controller
 from browser_use.dom.service import DomService as DomService
 
@@ -23,5 +22,4 @@ __all__ = [
 	'ActionResult',
 	'ActionModel',
 	'AgentHistoryList',
-	'BrowserContextConfig',
 ]

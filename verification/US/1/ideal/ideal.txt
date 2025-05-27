@@ -1,1 +1,0 @@
-GIVEN a user views the Deviations landing page WHEN he selects the item 'EMERGENCY' in the 'Deviation Type' field, declares the 'Effective End Date' equals 05/21/2002 and click in 'GO' THEN an error is showed

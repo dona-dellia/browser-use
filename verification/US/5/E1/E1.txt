@@ -1,1 +1,0 @@
-GIVEN the user is on the Pilot BOM page AND has the necessary permissions to view and search for Pilot BOMs, WHEN the user enters 'PLT00006060' in the 'PLT Number' field and clicks the 'GO' button, THEN the search results should display the Pilot BOM with the matching PLT number 'PLT00006060'.

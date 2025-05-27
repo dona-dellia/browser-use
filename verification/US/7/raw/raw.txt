@@ -1,3 +1,0 @@
-GIVEN the user is on the deviations page
-WHEN the page is loaded
-THEN the upload template button is displayed and disabled by default

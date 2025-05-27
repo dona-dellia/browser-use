@@ -25,7 +25,6 @@ class InputTextAction(BaseModel):
 
 class DoneAction(BaseModel):
 	text: str
-	success: bool
 
 
 class SwitchTabAction(BaseModel):
@@ -42,10 +41,6 @@ class ScrollAction(BaseModel):
 
 class SendKeysAction(BaseModel):
 	keys: str
-
-
-class ExtractPageContentAction(BaseModel):
-	value: str
 
 
 class NoParamsAction(BaseModel):

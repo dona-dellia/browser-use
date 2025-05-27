@@ -4,27 +4,8 @@ import json
 import pytest
 
 from browser_use.browser.browser import Browser, BrowserConfig
-from browser_use.dom.views import DOMBaseNode, DOMElementNode, DOMTextNode
+from browser_use.dom.views import ElementTreeSerializer
 from browser_use.utils import time_execution_sync
-
-
-class ElementTreeSerializer:
-	@staticmethod
-	def dom_element_node_to_json(element_tree: DOMElementNode) -> dict:
-		def node_to_dict(node: DOMBaseNode) -> dict:
-			if isinstance(node, DOMTextNode):
-				return {'type': 'text', 'text': node.text}
-			elif isinstance(node, DOMElementNode):
-				return {
-					'type': 'element',
-					'tag_name': node.tag_name,
-					'attributes': node.attributes,
-					'highlight_index': node.highlight_index,
-					'children': [node_to_dict(child) for child in node.children],
-				}
-			return {}
-
-		return node_to_dict(element_tree)
 
 
 # run with: pytest browser_use/browser/tests/test_clicks.py
@@ -33,7 +14,7 @@ async def test_highlight_elements():
 	browser = Browser(config=BrowserConfig(headless=False, disable_security=True))
 
 	async with await browser.new_context() as context:
-		page = await context.get_current_page()
+		driver = await context.get_current_driver()
 		# await page.goto('https://immobilienscout24.de')
 		# await page.goto('https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/service-plans')
 		# await page.goto('https://google.com/search?q=elon+musk')
@@ -41,7 +22,7 @@ async def test_highlight_elements():
 		# await page.goto('https://www.w3schools.com/tags/tryit.asp?filename=tryhtml_iframe')
 		# await page.goto('https://dictionary.cambridge.org')
 		# await page.goto('https://github.com')
-		await page.goto('https://huggingface.co/')
+		driver.get('https://huggingface.co/')
 
 		await asyncio.sleep(1)
 

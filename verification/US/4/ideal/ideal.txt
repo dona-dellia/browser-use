@@ -1,3 +1,0 @@
-GIVEN the user navigates to the Pilot BOMs Search page
-WHEN the page is loaded
-THEN the 'Pilot BOMs' widget should display the correct regions: APCC, BHR,CCC2,CCC4,DAO,EMEA

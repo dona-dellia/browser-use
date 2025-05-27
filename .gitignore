@@ -113,7 +113,6 @@ ipython_config.py
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
-
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
@@ -152,10 +151,15 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+# Ignorar arquivos compilados do Python
+*.pyc
+__pycache__/
 
 # Cython debug symbols
 cython_debug/
-
+.env
+*.txt
+code.py
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
@@ -181,10 +185,5 @@ gcp-login.json
 .vscode
 .ruff_cache
 .idea
-#*.txt
-*.pdf
-*.csv
-#*.json
-*.jsonl
-
-uv.lock
+__pycache__/
+/browser_use/__pycache__

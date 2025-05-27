@@ -1,3 +1,0 @@
-GIVEN a user is on the Deviations landing page, 
-WHEN they select 'EMERGENCY' as the 'Deviation Type' and '05/21/2001' as the 'Effective End Date', and click the 'GO' button, 
-THEN no deviations should be displayed in the results section, indicating there are no Emergency Deviations before May 21st, 2002.
