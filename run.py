@@ -44,7 +44,7 @@ llm= ChatOpenAI(
     )
 agent = Agent(
 		task=(
-			"""in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home GIVEN a user is on the Change Objects landing page and is logged in with their user ID retrievable from local storage, WHEN the user selects the 'LOB' dropdown in the search interface, Select the wd as the olny option
+			"""in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home GIVEN a user is on the Change Objects landing page and is logged in with their user ID retrievable from local storage, WHEN the user selects the 'status' dropdown in the search interface, Select the wd as the only option
    """),
 		llm=llm,
 		use_vision=False,
@@ -56,6 +56,7 @@ agent = Agent(
 		sensitive_data=sensitive_data,
         save_conversation_path="output/scroll_element",
         message_context=glossary,
+        save_images_path = "output/scroll_element/images",
 	)
 async def main():
 

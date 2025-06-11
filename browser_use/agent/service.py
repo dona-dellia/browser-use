@@ -74,6 +74,7 @@ class Agent:
 		use_vision: bool = True,
 		use_vision_for_planner: bool = False,
 		save_conversation_path: Optional[str] = None,
+		save_images_path: Optional[str] = None,
 		save_conversation_path_encoding: Optional[str] = 'utf-8',
 		max_failures: int = 3,
 		retry_delay: int = 10,
@@ -115,12 +116,13 @@ class Agent:
 			self.page_extraction_llm = llm
 		else:
 			self.page_extraction_llm = page_extraction_llm
-
+		self.final_reason = "max steps reached"
 		self.task = task
 		self.use_vision = use_vision
 		self.use_vision_for_planner = use_vision_for_planner
 		self.llm = llm
 		self.save_conversation_path = save_conversation_path
+		self.save_images_path = save_images_path
 		self.save_conversation_path_encoding = save_conversation_path_encoding
 		self._last_result = None
 		self.include_attributes = include_attributes
@@ -327,6 +329,7 @@ class Agent:
 			self._last_result = result
 
 			if len(result) > 0 and result[-1].is_done:
+				self.final_reason = result[-1].extracted_content
 				logger.info(f'📄 Result: {result[-1].extracted_content}')
 
 			self.consecutive_failures = 0
@@ -668,6 +671,8 @@ class Agent:
 		response: dict[str, Any] = await validator.ainvoke(msg)  # type: ignore
 		parsed: ValidationResult = response['parsed']
 		is_valid = parsed.is_valid
+		print(f"parsed.reason: {parsed.reason}{type(parsed.reason)}")
+		self.final_reason = parsed.reason
 		if not is_valid:
 			logger.info(f'❌ Validator decision: {parsed.reason}')
 			msg = f'The output is not yet correct. {parsed.reason}.'
@@ -910,7 +915,16 @@ class Agent:
 				)
 
 			images.append(image)
-
+		# imagem final com o resultado final
+		task_frame = self._create_task_frame(
+				self.final_reason,
+				self.history.history[0].state.screenshot,
+				title_font,
+				regular_font,
+				logo,
+				line_spacing,
+			)
+		images.append(task_frame)
 		if images:
 			# Save the GIF
 			images[0].save(
@@ -924,6 +938,11 @@ class Agent:
 			logger.info(f'Created GIF at {output_path}')
 		else:
 			logger.warning('No images found in history to create GIF')
+
+		os.makedirs(self.save_images_path, exist_ok=True)
+		for idx, img in enumerate(images, start=1):
+			file_path = os.path.join(self.save_images_path, f'image_{idx:03d}.png')
+			img.save(file_path)
 
 	def _create_task_frame(
 		self,

@@ -201,6 +201,20 @@ class BrowserContext:
 		"""Creates a new browser driver with anti-detection measures and loads cookies if available."""
 		print('Creating new browser driver')
 		options = ChromeOptions()
+		options.add_argument("--disable-dev-shm-usage")
+		options.add_argument("--disable-gpu")
+		options.add_argument("--ignore-ssl-errors=yes")
+		options.add_argument("--ignore-certificate-errors")
+		options.add_argument("--ignore-certificate-errors-spki-list")
+		options.add_argument("--ignore-ssl-certificate-errors")
+		options.add_argument("--allow-running-insecure-content")
+		options.add_argument("--disable-web-security")
+		options.add_argument("--allow-running-insecure-content")
+		options.add_argument("--insecure")
+		options.add_argument("--ignore-certificate-errors-spki-list")
+		options.add_argument("--ignore-certificate-errors")
+		options.add_argument("--ignore-urlfetcher-cert-requests")
+
 		if self.config.headless:
 			options.add_argument('--headless')
 			options.add_argument("--window-size=1280,1024")
@@ -232,7 +246,7 @@ class BrowserContext:
 		
 		# Create driver
 		service = Service(ChromeDriverManager().install())
-		driver = Chrome(service=service, options=options)
+		driver = Chrome(options=options)
 		
 		# Execute anti-detection script
 		driver.execute_script("""

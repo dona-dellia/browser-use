@@ -108,6 +108,25 @@ class SystemPrompt:
 
 12. Fail:
 - If your task failed more than once, try call extract_content on the specific page to help you out
+13. DROPDOWN SUPER IMPORTANT INFORMATION!!!!!!
+- If you find a dropdown like element in a state like this below, probably caused by hidden options that need to scroll down to appear(in this case the [0] ignore), please use scrolldown function if you need to select an option that is hidden.
+```
+[0]<div role="listbox" tabindex="-1">Ignore
+New
+Rejected
+Success
+Waiting
+Waiting-Deviation</div>
+[1]<input type="checkbox" tabindex="0"></input>
+[2]<label >Select All</label>
+[3]<mat-option role="option">Ad Hoc</mat-option>
+[4]<mat-option role="option">Approved</mat-option>
+[5]<mat-option role="option">BackFed</mat-option>
+[6]<mat-option role="option">Failed</mat-option>
+[7]<mat-option role="option">Hold</mat-option>
+```
+14. dropdowns select all options as default
+After clicked in a dropdown, before select the desire element, click element "select all" element
 """
 		text += f'   - use maximum {self.max_actions_per_step} actions per sequence'
 		return text
@@ -234,7 +253,7 @@ Interactive elements from current page:
 			vdi_api_key: str = os.getenv("VDI_API_KEY") # type: ignore
 			llm= ChatOpenAI(
 				base_url="https://genai-api-dev.dell.com/v1",
-				model="llama-3-2-11b-vision-instruct",
+				model="llava-v1-6-34b-hf-vllm",
 				api_key=SecretStr(vdi_api_key),
 				http_client=httpx.Client(verify=False),
 				
@@ -249,8 +268,10 @@ Interactive elements from current page:
 						},
 					]
 				)])
-				return HumanMessage(content=[{"type": "text", "text": f"Model response: {response.content} and state_description{state_description}"}])
+				return HumanMessage(content=[{"type": "text", "text": f"Model response: {response.content}"}])
 			sleep(3)
+			resposta = process_image()
+			print(f"\na resposta da imagem: {resposta}\n")
 			return process_image()
 		return HumanMessage(content=state_description)
 

@@ -7,7 +7,7 @@ config = BrowserContextConfig(
 	wait_for_network_idle_page_load_time=3.0,
 	headless=False,
 )
-conf = BrowserConfig(disable_security=True)
+conf = BrowserConfig()#disable_security=True),#chrome_instance_path=)
 
 browser = Browser(config=conf)
 context = BrowserContext(browser=browser, config=config)
