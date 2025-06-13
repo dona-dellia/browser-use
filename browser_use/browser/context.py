@@ -448,7 +448,75 @@ class BrowserContext:
 				viewport_expansion=self.config.viewport_expansion,
 				highlight_elements=self.config.highlight_elements,
 			)
-
+			#print(f"\no conteudo da arvore\n {content.element_tree.clickable_elements_to_string()}\n conteudo do seletor \n{content.selector_map.items()}\n")
+			#print(content.element_tree.clickable_elements_to_string())
+			# Create a list of selectors for clickable elements from the selector map
+			clickable_selectors = []
+			for idx in sorted(content.selector_map.keys()):
+				element = content.selector_map[idx]
+				css_selector = self._enhanced_css_selector_for_element(
+					element, include_dynamic_attributes=self.config.include_dynamic_attributes
+				)
+				clickable_selectors.append(css_selector)
+			
+			# Pass the selectors to JavaScript to get accessibility data
+			accessibility_data = driver.execute_script("""
+				function collectA11yData(element, index) {
+					if (!element) return null;
+					
+					// Get element position for mapping
+					const rect = element.getBoundingClientRect();
+					
+					// Basic element properties
+					return {
+						index: index,
+						role: element.getAttribute('role') || element.tagName.toLowerCase(),
+						checked: element.checked || element.getAttribute('aria-checked') === 'true',
+						selected: element.selected || element.getAttribute('aria-selected') === 'true',
+						disabled: element.disabled || element.getAttribute('aria-disabled') === 'true',
+						x: rect.x,
+						y: rect.y,
+						width: rect.width,
+						height: rect.height
+					};
+				}
+				
+				const selectors = arguments[0];
+				const results = [];
+				
+				// Match elements to provided selectors from Python
+				for (let i = 0; i < selectors.length; i++) {
+					try {
+						const element = document.querySelector(selectors[i]);
+						if (element) {
+							results.push(collectA11yData(element, i));
+						} else {
+							results.push(null);
+						}
+					} catch (e) {
+						console.error('Error finding element:', e);
+						results.push(null);
+					}
+				}
+				
+				return results;
+			""", clickable_selectors)
+			
+			# Create box_check dictionary mapping element indices to their states
+			box_check = {}
+			for node in accessibility_data:
+				if not node:
+					continue
+				
+				# Use the element's index as the key
+				idx = node.get('index')
+				if idx is not None:
+					box_check[idx] = {
+						'checked': node.get('checked', False),
+						'selected': node.get('selected', False),
+						'disabled': node.get('disabled', False)
+					}
+			#print(box_check)
 			screenshot_b64 = await self.take_screenshot()
 			pixels_above, pixels_below = await self.get_scroll_info(driver)
 
@@ -461,6 +529,7 @@ class BrowserContext:
 				screenshot=screenshot_b64,
 				pixels_above=pixels_above,
 				pixels_below=pixels_below,
+				box_check=box_check,
 			)
 
 			return self.current_state

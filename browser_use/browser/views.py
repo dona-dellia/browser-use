@@ -25,6 +25,7 @@ class BrowserState(DOMState):
 	pixels_above: int = 0
 	pixels_below: int = 0
 	browser_errors: list[str] = field(default_factory=list)
+	box_check: Optional[dict[Any, Any]] = None
 
 
 @dataclass
