@@ -290,7 +290,42 @@
             style.visibility !== 'hidden' &&
             style.display !== 'none';
     }
+    function isElementCovered(element) {
+        const rect = element.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
 
+        // Se o elemento não está visível, não faz sentido checar cobertura
+        if (!isElementVisible(element)) return false;
+
+        // Pega o elemento no topo visual nesse ponto
+        const topEl = document.elementFromPoint(centerX, centerY);
+
+        // Se o próprio elemento está no topo, não está coberto
+        if (topEl === element) return false;
+
+        // Se o topo é descendente do elemento, também não está coberto
+        if (topEl && element.contains(topEl)) return false;
+
+        // Se o topo é um overlay/modal/dropdown, consideramos coberto
+        // (Você pode refinar essa checagem por classe, atributo, etc)
+        if (topEl) {
+            const overlayClasses = [
+                'modal', 'dropdown', 'popup', 'overlay', 'dialog', 'menu', 'select-menu'
+            ];
+            for (const cls of overlayClasses) {
+                if (topEl.classList && topEl.classList.contains(cls)) {
+                    return true;
+                }
+            }
+            // Se tem z-index alto, também pode ser overlay
+            const z = window.getComputedStyle(topEl).zIndex;
+            if (z && !isNaN(z) && Number(z) > 1000) return true;
+        }
+
+        // Se chegou aqui, está coberto por outro elemento qualquer
+        return true;
+    }
     // Helper function to check if element is the top element at its position
     function isTopElement(element) {
         // Find the correct document context and root element
@@ -377,6 +412,9 @@
             while (current && current !== document.documentElement) {
                 if (current === element) return true;
                 current = current.parentElement;
+            }
+            if (isInteractiveElement(element) && isElementVisible(element)) {
+                return !isElementCovered(element);
             }
             return false;
         } catch (e) {
@@ -510,13 +548,15 @@
             const isInteractive = isInteractiveElement(node);
             const isVisible = isElementVisible(node);
             const isTop = isTopElement(node);
+            const isCovered = isInteractive && isVisible ? isElementCovered(node) : false;
 
             nodeData.isInteractive = isInteractive;
             nodeData.isVisible = isVisible;
             nodeData.isTopElement = isTop;
-
+            nodeData.isCoveredByOverlay = isCovered;
+            
             // Highlight if element meets all criteria and highlighting is enabled
-            if (isInteractive && isVisible && isTop) {
+            if (isInteractive && isVisible) {
                 nodeData.highlightIndex = highlightIndex++;
                 if (doHighlightElements) {
                     if(focusHighlightIndex >= 0){

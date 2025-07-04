@@ -13,6 +13,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, TypedDict, Awaitable, Any, Protocol, Union
 
+import requests
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -21,11 +22,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import NoSuchElementException
+import websocket
 
 from browser_use.browser.views import BrowserError, BrowserState, TabInfo, URLNotAllowedError
 from browser_use.dom.service import DomService
 from browser_use.dom.views import DOMElementNode, SelectorMap
 from browser_use.utils import time_execution_sync
+from browser_use.dom.accessibility import parse_accessibility_tree, AccessibilityTree
 
 if TYPE_CHECKING:
 	from browser_use.browser.browser import Browser
@@ -214,6 +217,8 @@ class BrowserContext:
 		options.add_argument("--ignore-certificate-errors-spki-list")
 		options.add_argument("--ignore-certificate-errors")
 		options.add_argument("--ignore-urlfetcher-cert-requests")
+		options.add_argument("--remote-debugging-port=9222")
+		options.add_argument("--remote-allow-origins=http://localhost:9222")
 
 		if self.config.headless:
 			options.add_argument('--headless')
@@ -286,6 +291,131 @@ class BrowserContext:
 					driver.add_cookie(cookie)
 		
 		return driver
+
+	async def get_partial_accessibility_tree(self, backend_node_id: int | None = None) -> dict:
+		import requests, websocket
+
+		try:
+			tabs = requests.get("http://localhost:9222/json").json()
+			ws_url = tabs[0]["webSocketDebuggerUrl"]
+			ws = websocket.create_connection(ws_url)
+
+			# Habilitar o domínio Accessibility
+			ws.send(json.dumps({"id": 1, "method": "Accessibility.enable"}))
+			ws.recv()
+
+			# Obter o AX tree parcial (o que o DevTools mostra na aba Accessibility)
+			request = {
+				"id": 2,
+				"method": "Accessibility.getPartialAXTree",
+				"params": {
+					"fetchRelatives": True
+				}
+			}
+			if backend_node_id:
+				request["params"]["backendNodeId"] = backend_node_id
+
+			ws.send(json.dumps(request))
+			result = json.loads(ws.recv())
+			ws.close()
+
+			with open("partial_accessibility_tree.json", "w", encoding="utf-8") as f:
+				json.dump(result, f, indent=2, ensure_ascii=False)
+
+			return result
+
+		except Exception as e:
+			logger.error(f"[Accessibility] Erro ao obter árvore parcial: {e}")
+			return {}
+
+	async def get_accessibility_tree_info(self) -> tuple[str, dict[str, Any]]:
+		"""
+		Extrai a árvore de acessibilidade usando o Chrome DevTools Protocol via driver.execute_cdp_cmd.
+		"""  # ou onde você armazena o `driver`
+		driver = self.session.driver
+		try:
+			tree_data = driver.execute_cdp_cmd("Accessibility.getFullAXTree", {})
+			accessibility_tree: AccessibilityTree = tree_data.get("nodes", [])
+			return parse_accessibility_tree(accessibility_tree)
+		except Exception as e:
+			logger.error(f"[Accessibility] Erro ao capturar árvore de acessibilidade: {e}")
+			return "", {}
+
+	async def get_partial_accessibility_tree_from_body(self) -> dict:
+		import requests, websocket, json, time
+
+		try:
+			tabs = requests.get("http://localhost:9222/json").json()
+			ws_url = tabs[0]["webSocketDebuggerUrl"]
+			ws = websocket.create_connection(ws_url)
+
+			# 1. Ativar domínios
+			ws.send(json.dumps({"id": 1, "method": "DOM.enable"}))
+			ws.recv()
+			ws.send(json.dumps({"id": 2, "method": "Accessibility.enable"}))
+			ws.recv()
+
+			# 2. Obter root node
+			ws.send(json.dumps({
+				"id": 3,
+				"method": "DOM.getDocument",
+				"params": {"depth": -1}
+			}))
+			root = json.loads(ws.recv())
+			if "result" not in root:
+				raise Exception(f"[AXTree] Falha DOM.getDocument: {root}")
+			root_id = root["result"]["root"]["nodeId"]
+
+			# 3. Esperar até encontrar o <body>
+			body_node_id = None
+			timeout = 5
+			start_time = time.time()
+
+			while time.time() - start_time < timeout:
+				ws.send(json.dumps({
+					"id": 4,
+					"method": "DOM.querySelector",
+					"params": {"nodeId": root_id, "selector": "body"}
+				}))
+				resp = json.loads(ws.recv())
+				if "result" in resp and "nodeId" in resp["result"] and resp["result"]["nodeId"] != 0:
+					body_node_id = resp["result"]["nodeId"]
+					break
+				time.sleep(0.2)  # esperar antes de tentar de novo
+
+			if not body_node_id:
+				raise Exception(f"[AXTree] Não foi possível localizar o <body> após {timeout}s")
+
+			# 4. Pega backendNodeId
+			ws.send(json.dumps({
+				"id": 5,
+				"method": "DOM.describeNode",
+				"params": {"nodeId": body_node_id}
+			}))
+			desc = json.loads(ws.recv())
+			if "result" not in desc or "node" not in desc["result"]:
+				raise Exception(f"[AXTree] describeNode falhou: {desc}")
+			backend_id = desc["result"]["node"]["backendNodeId"]
+
+			# 5. Pega árvore parcial
+			ws.send(json.dumps({
+				"id": 6,
+				"method": "Accessibility.getPartialAXTree",
+				"params": {"backendNodeId": backend_id, "fetchRelatives": True}
+			}))
+			tree = json.loads(ws.recv())
+			ws.close()
+
+			with open("partial_accessibility_tree.json", "w", encoding="utf-8") as f:
+				json.dump(tree, f, indent=2, ensure_ascii=False)
+
+			logger.info("[AXTree] Árvore de acessibilidade parcial salva com sucesso.")
+			return tree
+
+		except Exception as e:
+			logger.error(f"[AXTree] Erro ao gerar árvore de acessibilidade parcial: {e}")
+			return {}
+
 
 	async def get_session(self) -> BrowserSession:
 		"""Lazy initialization of the browser and related components"""
@@ -441,13 +571,16 @@ class BrowserContext:
 
 		try:
 			await self.remove_highlights()
-
+			tree_str, nodes_info = await self.get_accessibility_tree_info()
+			print(f'Accessibility tree:\n{tree_str}')
 			dom_service = DomService(driver)
 			content = await dom_service.get_clickable_elements(
 				focus_element=focus_element,
 				viewport_expansion=self.config.viewport_expansion,
 				highlight_elements=self.config.highlight_elements,
 			)
+			tree_str, nodes_info = await self.get_accessibility_tree_info()
+			print(f'Accessibility tree2:\n{tree_str}')
 			#print(f"\no conteudo da arvore\n {content.element_tree.clickable_elements_to_string()}\n conteudo do seletor \n{content.selector_map.items()}\n")
 			#print(content.element_tree.clickable_elements_to_string())
 			# Create a list of selectors for clickable elements from the selector map

@@ -97,6 +97,16 @@ class Agent:
 			'value',
 			'alt',
 			'aria-expanded',
+			'disabled',
+			'checked',
+			'selected',
+			'aria-checked',
+			'aria-selected',
+			'aria-disabled',
+			'aria-pressed',
+			'aria-expanded',
+			'aria-label',
+			'aria-hidden',
 		],
 		max_error_length: int = 400,
 		max_actions_per_step: int = 10,
@@ -287,10 +297,11 @@ class Agent:
 		result: list[ActionResult] = []
 
 		try:
+			tree_str = ''
 			state = await self.browser_context.get_state()
 
 			self._check_if_stopped_or_paused()
-			self.message_manager.add_state_message(state, self._last_result, step_info, self.use_vision)
+			self.message_manager.add_state_message(state, self._last_result, step_info, self.use_vision,tree_str)
 
 			# Run planner at specified intervals if planner is configured
 			if self.planner_llm and self.n_steps % self.planning_interval == 0:
@@ -439,7 +450,7 @@ class Agent:
 	async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
 		"""Get next action from LLM based on current state"""
 		input_messages = self._convert_input_messages(input_messages, self.model_name)
-
+		#print(f'Input messages: {input_messages}')
 		if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1'):
 			output = self.llm.invoke(input_messages)
 			output.content = self._remove_think_tags(output.content)

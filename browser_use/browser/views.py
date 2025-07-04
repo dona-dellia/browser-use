@@ -28,6 +28,7 @@ class BrowserState(DOMState):
 	box_check: Optional[dict[Any, Any]] = None
 
 
+
 @dataclass
 class BrowserStateHistory:
 	url: str

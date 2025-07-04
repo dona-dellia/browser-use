@@ -108,8 +108,24 @@ class SystemPrompt:
 
 12. Fail:
 - If your task failed more than once, try call extract_content on the specific page to help you out
+13. DROPDOWN SUPER IMPORTANT INFORMATION!!!!!!
+- If you find a dropdown like element in a state like this below, probably caused by hidden options that need to scroll down to appear(in this case the [0] ignore), please use scrolldown function if you need to select an option that is hidden.
 ```
-13. dropdowns select all options as default
+[0]<div role="listbox" tabindex="-1">Ignore
+New
+Rejected
+Success
+Waiting
+Waiting-Deviation</div>
+[1]<input type="checkbox" tabindex="0"></input>
+[2]<label >Select All</label>
+[3]<mat-option role="option">Ad Hoc</mat-option>
+[4]<mat-option role="option">Approved</mat-option>
+[5]<mat-option role="option">BackFed</mat-option>
+[6]<mat-option role="option">Failed</mat-option>
+[7]<mat-option role="option">Hold</mat-option>
+```
+14. dropdowns select all options as default
 After clicked in a dropdown, before select the desire element, click element "select all" element
 """
 		text += f'   - use maximum {self.max_actions_per_step} actions per sequence'
@@ -175,12 +191,14 @@ class AgentMessagePrompt:
 		include_attributes: list[str] = [],
 		max_error_length: int = 400,
 		step_info: Optional[AgentStepInfo] = None,
+		tree_str: Optional[str] = None,
 	):
 		self.state = state
 		self.result = result
 		self.max_error_length = max_error_length
 		self.include_attributes = include_attributes
 		self.step_info = step_info
+		self.tree_str = tree_str
 
 	def get_user_message(self, use_vision: bool = True) -> HumanMessage:
 		elements_text = self.state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
@@ -215,14 +233,20 @@ class AgentMessagePrompt:
 [Task history memory ends here]
 [Current state starts here]
 You will see the following only once - if you need to remember it and you dont know it yet, write it down in the memory:
+\n
 Current url: {self.state.url}
+\n
 Available tabs:
 {self.state.tabs}
 Interactive elements from current page:
+\n
 {elements_text}
+\n
 {step_info_description}
-Properties of elements from current page:
-{self.state.box_check}
+\n
+tree structure:
+{self.tree_str if self.tree_str else 'No tree structure available.'}
+
 """
 
 		if self.result:

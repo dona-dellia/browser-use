@@ -44,8 +44,7 @@ llm= ChatOpenAI(
     )
 agent = Agent(
 		task=(
-			"""in https://prism-cm-adapter-ge4.pnp4.pcf.dell.com/home GIVEN a user is on the Change Objects landing page and is logged in with their user ID retrievable from local storage, WHEN the user selects the 'status' dropdown in the search interface, Select the wd as the only option
-   """),
+			""""GIVEN a user fills fields(Change Object Type, with only ECO, status with only Success, Regions Affected with only DAO AND EMEA) on the Change Object page WHEN he clicks the 'RESET' button THEN all fields in the form are cleared"""),
 		llm=llm,
 		use_vision=False,
 		max_failures=10,
@@ -56,6 +55,7 @@ agent = Agent(
 		sensitive_data=sensitive_data,
         save_conversation_path="output/scroll_element",
         message_context=glossary,
+        max_actions_per_step=2,
         save_images_path = "output/scroll_element/images",
 	)
 async def main():

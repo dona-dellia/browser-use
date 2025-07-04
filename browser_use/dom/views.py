@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypedDict
 
 from browser_use.dom.history_tree_processor.view import CoordinateSet, HashedDomElement, ViewportInfo
 
@@ -14,7 +14,25 @@ class DOMBaseNode:
 	is_visible: bool
 	# Use None as default and set parent later to avoid circular reference issues
 	parent: Optional['DOMElementNode']
+ 
+@dataclass(frozen=False)
+class AccessibilityTreeNode(TypedDict, total=False):
+    nodeId: str
+    ignored: bool
+    role: dict[str, Any]
+    chromeRole: dict[str, Any]
+    name: dict[str, Any]
+    properties: List[dict[str, Any]]
+    childIds: List[str]
+    parentId: str
+    backendDOMNodeId: str
+    frameId: str
+    bound: List[float] | None
+    union_bound: List[float] | None
+    offsetrect_bound: List[float] | None
+    customAttributes: dict[str, Any]
 
+AccessibilityTree = List[AccessibilityTreeNode]
 
 @dataclass(frozen=False)
 class DOMTextNode(DOMBaseNode):
@@ -117,7 +135,7 @@ class DOMElementNode(DOMBaseNode):
 					formatted_text.append(
 						f'[{node.highlight_index}]<{node.tag_name}{attributes_str}>{node.get_all_text_till_next_clickable_element()}</{node.tag_name}>'
 					)
-
+				
 				# Process children regardless
 				for child in node.children:
 					process_node(child, depth + 1)

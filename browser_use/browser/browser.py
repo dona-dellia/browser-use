@@ -134,7 +134,6 @@ class Browser:
 		""")
 		
 		return self.driver
-
 	async def close(self):
 		"""Close the browser instance"""
 		try:

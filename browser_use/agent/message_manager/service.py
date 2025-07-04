@@ -131,6 +131,7 @@ class MessageManager:
 		result: Optional[List[ActionResult]] = None,
 		step_info: Optional[AgentStepInfo] = None,
 		use_vision=True,
+		tree_str: Optional[str] = None,
 	) -> None:
 		"""Add browser state as human message"""
 
@@ -153,6 +154,7 @@ class MessageManager:
 			include_attributes=self.include_attributes,
 			max_error_length=self.max_error_length,
 			step_info=step_info,
+			tree_str=tree_str,
 		).get_user_message(use_vision)
 		self._add_message_with_tokens(state_message)
 
