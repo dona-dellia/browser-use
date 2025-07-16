@@ -1,6 +1,6 @@
 import logging
 from importlib import resources
-from typing import Optional
+from typing import Any, List, Optional
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
@@ -14,6 +14,7 @@ from browser_use.dom.views import (
 	SelectorMap,
 	ViewportInfo,
 )
+from browser_use.dom.accessibility import parse_accessibility_tree, AccessibilityTree
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,47 @@ class DomService:
 	def __init__(self, driver: WebDriver):
 		self.driver = driver
 		self.xpath_cache = {}
+
+	def _filter_nodes(self, current):
+		exclude = []
+		highlight_map = {}
+
+		for node in current:
+			if "attributes" in node:
+				attrs: List[str] = node["attributes"]
+				has_highlight_attribute = "browser-user-highlight-label" in attrs
+				is_highlighted_element = "browser-user-highlight-id" in attrs
+
+				if has_highlight_attribute: 
+					exclude.append(node)
+				elif is_highlighted_element:
+					highlight_index = int(next(attr for attr in attrs if attr.startswith("browser-user-highlight-") and attr != "browser-user-highlight-id").split("-")[-1])
+					highlight_map[node["backendNodeId"]] = highlight_index
+
+			if "children" in node:
+				children_exclude, children_highlight_map = self._filter_nodes(node["children"])
+				exclude += children_exclude
+				highlight_map = highlight_map | children_highlight_map
+
+		return exclude, highlight_map
+
+	async def _get_accessibility_tree_info(self) -> tuple[str, dict[str, Any]]:
+		"""
+		Extrai a árvore de acessibilidade usando o Chrome DevTools Protocol via driver.execute_cdp_cmd.
+		"""
+		driver = self.driver
+		try:
+			tree_data = driver.execute_cdp_cmd("Accessibility.getFullAXTree", {})
+			exclude_nodes, highlight_map = self._filter_nodes(driver.execute_cdp_cmd("DOM.getDocument", {
+				"depth": -1
+			})["root"]["children"])
+			browser_use_node_ids = {node["backendNodeId"] for node in exclude_nodes}
+			accessibility_tree: AccessibilityTree = tree_data.get("nodes", [])
+			filtered_accessibility_tree = list(filter(lambda node: "backendDOMNodeId" in node and node["backendDOMNodeId"] not in browser_use_node_ids, accessibility_tree))
+			return parse_accessibility_tree(filtered_accessibility_tree, highlight_map)
+		except Exception as e:
+			logger.error(f"[Accessibility] Erro ao capturar árvore de acessibilidade: {e}")
+			return "", {}
 
 	# region - Clickable elements
 	async def get_clickable_elements(
@@ -32,8 +74,9 @@ class DomService:
 	) -> DOMState:
 		element_tree = await self._build_dom_tree(highlight_elements, focus_element, viewport_expansion)
 		selector_map = self._create_selector_map(element_tree)
+		tree_str, _ = await self._get_accessibility_tree_info()
 
-		return DOMState(element_tree=element_tree, selector_map=selector_map)
+		return DOMState(element_tree=element_tree, selector_map=selector_map, a11y_tree=tree_str)
 
 	async def _build_dom_tree(
 		self,

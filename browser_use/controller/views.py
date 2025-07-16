@@ -25,6 +25,7 @@ class InputTextAction(BaseModel):
 
 class DoneAction(BaseModel):
 	text: str
+	is_success: bool
 
 
 class SwitchTabAction(BaseModel):

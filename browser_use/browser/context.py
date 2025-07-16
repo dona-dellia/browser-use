@@ -11,7 +11,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, TypedDict, Awaitable, Any, Protocol, Union
+from typing import TYPE_CHECKING, List, Optional, TypedDict, Awaitable, Any, Protocol, Union
 
 import requests
 from selenium.webdriver import Chrome, ChromeOptions
@@ -28,7 +28,6 @@ from browser_use.browser.views import BrowserError, BrowserState, TabInfo, URLNo
 from browser_use.dom.service import DomService
 from browser_use.dom.views import DOMElementNode, SelectorMap
 from browser_use.utils import time_execution_sync
-from browser_use.dom.accessibility import parse_accessibility_tree, AccessibilityTree
 
 if TYPE_CHECKING:
 	from browser_use.browser.browser import Browser
@@ -328,19 +327,6 @@ class BrowserContext:
 			logger.error(f"[Accessibility] Erro ao obter árvore parcial: {e}")
 			return {}
 
-	async def get_accessibility_tree_info(self) -> tuple[str, dict[str, Any]]:
-		"""
-		Extrai a árvore de acessibilidade usando o Chrome DevTools Protocol via driver.execute_cdp_cmd.
-		"""  # ou onde você armazena o `driver`
-		driver = self.session.driver
-		try:
-			tree_data = driver.execute_cdp_cmd("Accessibility.getFullAXTree", {})
-			accessibility_tree: AccessibilityTree = tree_data.get("nodes", [])
-			return parse_accessibility_tree(accessibility_tree)
-		except Exception as e:
-			logger.error(f"[Accessibility] Erro ao capturar árvore de acessibilidade: {e}")
-			return "", {}
-
 	async def get_partial_accessibility_tree_from_body(self) -> dict:
 		import requests, websocket, json, time
 
@@ -571,16 +557,12 @@ class BrowserContext:
 
 		try:
 			await self.remove_highlights()
-			tree_str, nodes_info = await self.get_accessibility_tree_info()
-			print(f'Accessibility tree:\n{tree_str}')
 			dom_service = DomService(driver)
 			content = await dom_service.get_clickable_elements(
 				focus_element=focus_element,
 				viewport_expansion=self.config.viewport_expansion,
 				highlight_elements=self.config.highlight_elements,
 			)
-			tree_str, nodes_info = await self.get_accessibility_tree_info()
-			print(f'Accessibility tree2:\n{tree_str}')
 			#print(f"\no conteudo da arvore\n {content.element_tree.clickable_elements_to_string()}\n conteudo do seletor \n{content.selector_map.items()}\n")
 			#print(content.element_tree.clickable_elements_to_string())
 			# Create a list of selectors for clickable elements from the selector map
@@ -663,6 +645,7 @@ class BrowserContext:
 				pixels_above=pixels_above,
 				pixels_below=pixels_below,
 				box_check=box_check,
+				a11y_tree=content.a11y_tree
 			)
 
 			return self.current_state
@@ -1121,4 +1104,5 @@ class BrowserContext:
 			title=driver.title if driver else '',
 			screenshot=None,
 			tabs=[],
+			a11y_tree=""
 		)

@@ -297,11 +297,10 @@ class Agent:
 		result: list[ActionResult] = []
 
 		try:
-			tree_str = ''
 			state = await self.browser_context.get_state()
 
 			self._check_if_stopped_or_paused()
-			self.message_manager.add_state_message(state, self._last_result, step_info, self.use_vision,tree_str)
+			self.message_manager.add_state_message(state, self._last_result, step_info, self.use_vision)
 
 			# Run planner at specified intervals if planner is configured
 			if self.planner_llm and self.n_steps % self.planning_interval == 0:
@@ -468,10 +467,11 @@ class Agent:
 		else:
 			
 			response_text = await self.llm.ainvoke(input_messages)
-			
+			print(f'Raw response: {response_text}')	
 			response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
 			response_text = self._remove_think_tags(response_text)
 			response_text = json.loads(response_text)
+			
 			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
 				response_text = response_text["parameters"]
 			#extract_page = {"extract_content": {"goal": f"Extract all visible text and structure related to the goal:{response_text["current_state"]["next_goal"]}"}}
@@ -597,7 +597,11 @@ class Agent:
 					if self.validate_output and step < max_steps - 1:
 						if not await self._validate_output():
 							continue
-					logger.info('✅ Task completed successfully')
+					was_task_successful = self.history.last_action()["done"]["is_success"]
+					if was_task_successful is True:
+						logger.info('✅ Task completed successfully')
+					else:
+						logger.info('❌ Failed to complete task')
 					if self.register_done_callback:
 						self.register_done_callback(self.history)
 					break

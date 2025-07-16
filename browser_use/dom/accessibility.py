@@ -5,7 +5,7 @@ IGNORED_ACTREE_PROPERTIES = {"busy", "live", "atomic", "containerLive"}
 HIGHLIGHT_ATTRS = {"browser-user-highlight-id", "playwright-highlight-id"}
 
 
-def parse_accessibility_tree(accessibility_tree: AccessibilityTree) -> tuple[str, dict[str, Any]]:
+def parse_accessibility_tree(accessibility_tree: AccessibilityTree, highlight_map: dict[int, int]) -> tuple[str, dict[str, Any]]:
     node_id_to_idx = {node["nodeId"]: idx for idx, node in enumerate(accessibility_tree)}
     obs_nodes_info = {}
 
@@ -36,20 +36,18 @@ def parse_accessibility_tree(accessibility_tree: AccessibilityTree) -> tuple[str
         mark_descendants(node_id)
 
     # === Passo 3: DFS ignorando highlights ===
-    def dfs(idx: int, obs_node_id: str, depth: int) -> str:
-        if obs_node_id in highlight_ids:
-            return ""
-
+    def dfs(idx: int, depth: int) -> str:
         node = accessibility_tree[idx]
         indent = "\t" * depth
         tree_str = ""
         valid_node = True
+        node_id = str(highlight_map[node["backendDOMNodeId"]]) if "backendDOMNodeId" in node and node["backendDOMNodeId"] in highlight_map else ""
 
         try:
             role = node["role"]["value"]
             name = node["name"]["value"]
 
-            node_str = f"[{obs_node_id}] {role} {repr(name)}"
+            node_str = f"[{node_id}] {role} {repr(name)}"
             properties = []
 
             for prop in node.get("properties", []):
@@ -80,7 +78,7 @@ def parse_accessibility_tree(accessibility_tree: AccessibilityTree) -> tuple[str
 
             if valid_node:
                 tree_str += f"{indent}{node_str}"
-                obs_nodes_info[obs_node_id] = {
+                obs_nodes_info[node["nodeId"]] = {
                     "backend_id": node.get("backendDOMNodeId"),
                     "union_bound": node.get("union_bound"),
                     "text": node_str,
@@ -93,7 +91,7 @@ def parse_accessibility_tree(accessibility_tree: AccessibilityTree) -> tuple[str
             if child_node_id not in node_id_to_idx:
                 continue
             child_depth = depth + 1 if valid_node else depth
-            child_str = dfs(node_id_to_idx[child_node_id], child_node_id, child_depth)
+            child_str = dfs(node_id_to_idx[child_node_id], child_depth)
             if child_str.strip():
                 if tree_str:
                     tree_str += "\n"
@@ -101,5 +99,5 @@ def parse_accessibility_tree(accessibility_tree: AccessibilityTree) -> tuple[str
 
         return tree_str
 
-    tree_str = dfs(0, accessibility_tree[0]["nodeId"], 0) if accessibility_tree else ""
+    tree_str = dfs(0, 0) if accessibility_tree else ""
     return tree_str, obs_nodes_info

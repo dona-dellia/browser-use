@@ -207,3 +207,4 @@ SelectorMap = dict[int, DOMElementNode]
 class DOMState:
 	element_tree: DOMElementNode
 	selector_map: SelectorMap
+	a11y_tree: str

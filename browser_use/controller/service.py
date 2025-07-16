@@ -89,7 +89,12 @@ class Controller(Generic[Context]):
 		else:
 
 			@self.registry.action(
-				'Complete task - with return text and if the task is finished (success=True) or not yet  completly finished (success=False), because last step is reached',
+				'''
+				Complete task - with return text and if the task is finished (success=True) or not yet completly finished (success=False), because last step is reached.
+				You should call this function when the task it's completly finished, like you executed all the steps that should be executed OR when you early
+				realizes that the task cannot be completed, like the task talks about clicking a button, but this button it's disabled or the task talks
+				about verifying some error message, but no error message appears.
+				''',
 				param_model=DoneAction,
 			)
 			async def done(params: DoneAction):

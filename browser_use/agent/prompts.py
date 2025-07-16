@@ -63,19 +63,29 @@ class SystemPrompt:
    - Elements marked with "[]Non-interactive text" are non-interactive (for context only)
 
 4. NAVIGATION & ERROR HANDLING:
-   - If no suitable elements exist, use other functions to complete the task
-   - If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
-   - Handle popups/cookies by accepting or closing them
-   - Use scroll to find elements you are looking for
-   - If you want to research something, open a new tab instead of using the current tab
-   - If captcha pops up, and you cant solve it, either ask for human help or try to continue the task on a different page.
+	- Only click buttons or links if you are one hundred certain that the element exists, is visible on the page, and has the correct text or attributes.
+	- Do not take any action if the target element is not found. If it's missing, log the issue and stop the task.
+	- Do not guess or make assumptions. Avoid making decisions without confirmation.
+	- If the task cannot continue:
+	- Clearly describe what prevented the action
+	- Then, and only then, consider one of the following recovery actions:
+	- Go back to the previous page
+	- Perform a new search
+	- Open a new tab and try again there
+	- Only accept or close popups/cookie banners if they truly appear and are clearly identified.
+	- Use scrolling only if the target element is present but not visible.
 
 5. TASK COMPLETION:
-   - Use the done action as the last action as soon as the ultimate task is complete
-   - Dont use "done" before you are done with everything the user asked you. 
-   - If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
-   - Don't hallucinate actions
-   - If the ultimate task requires specific information - make sure to include everything in the done function. This is what the user will see. Do not just say you are done, but include the requested information of the task.
+	- Only complete the task with done if:
+	- All requested steps were successfully executed
+	- All results have been confirmed
+	- Never use done if something was skipped, assumed, or uncertain.
+	- If the task involves repeated steps (e.g., "for each item", "repeat 5 times"):
+	- Accurately count how many times you've performed the task
+	- Keep going until all items are processed
+	- Never invent or assume results. If the task cannot be completed, log a clear explanation of why.
+	- When using done, always include the final output as requested (e.g., names, links, prices, error messages).
+	- Do not just write "task complete" without showing what was accomplished.
 
 6. VISUAL CONTEXT:
    - When an image is provided, use it to understand the page layout
@@ -160,10 +170,24 @@ Notes:
 		    str: Formatted system prompt
 		"""
 
-		AGENT_PROMPT = f"""You are a precise browser automation agent that interacts with websites through structured commands. Your role is to:
-1. Analyze the provided webpage elements and structure
-2. Use the given information to accomplish the ultimate task
-3. Respond with valid JSON containing your next action sequence and state assessment
+		AGENT_PROMPT = f"""You are a precise UI Quality Assurance Agent that interacts with websites through structured commands.
+
+		You will receive from the user a list of action steps that should be executed in target application, but the key
+		point is that we don't know if the steps provided by the user are practical executable in the application, because your job
+		is to validate that the provided steps works. For that, you should try to execute the provided step by the user and
+		check if the step is possible to be executed or if what the user said that should happen like 'display an error' indeed occured.
+
+		In summary, try to the execute the steps provided by the user but not admit that those steps will work as expected, so try
+		to execute them and validate its execution and if it's aligned with the user' list.
+
+		If something occured different from what the user listed, like a error message that should be displayed in the page
+		or some step could not be executed for any reason, like: according to the step a button should be clicked, but this
+		button it's disabled you should immediately end the task.
+		
+		So, your role is to:
+		1. Analyze the provided webpage elements and structure
+		2. Use the given information to accomplish the ultimate task
+		3. Respond with valid JSON containing your next action sequence and state assessment
 
 
 {self.input_format()}
@@ -191,36 +215,34 @@ class AgentMessagePrompt:
 		include_attributes: list[str] = [],
 		max_error_length: int = 400,
 		step_info: Optional[AgentStepInfo] = None,
-		tree_str: Optional[str] = None,
 	):
 		self.state = state
 		self.result = result
 		self.max_error_length = max_error_length
 		self.include_attributes = include_attributes
 		self.step_info = step_info
-		self.tree_str = tree_str
 
 	def get_user_message(self, use_vision: bool = True) -> HumanMessage:
-		elements_text = self.state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
+		# elements_text = self.state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
 
-		has_content_above = (self.state.pixels_above or 0) > 0
-		has_content_below = (self.state.pixels_below or 0) > 0
+		# has_content_above = (self.state.pixels_above or 0) > 0
+		# has_content_below = (self.state.pixels_below or 0) > 0
 
-		if elements_text != '':
-			if has_content_above:
-				elements_text = (
-					f'... {self.state.pixels_above} pixels above - scroll or extract content to see more ...\n{elements_text}'
-				)
-			else:
-				elements_text = f'[Start of page]\n{elements_text}'
-			if has_content_below:
-				elements_text = (
-					f'{elements_text}\n... {self.state.pixels_below} pixels below - scroll or extract content to see more ...'
-				)
-			else:
-				elements_text = f'{elements_text}\n[End of page]'
-		else:
-			elements_text = 'empty page'
+		# if elements_text != '':
+		# 	if has_content_above:
+		# 		elements_text = (
+		# 			f'... {self.state.pixels_above} pixels above - scroll or extract content to see more ...\n{elements_text}'
+		# 		)
+		# 	else:
+		# 		elements_text = f'[Start of page]\n{elements_text}'
+		# 	if has_content_below:
+		# 		elements_text = (
+		# 			f'{elements_text}\n... {self.state.pixels_below} pixels below - scroll or extract content to see more ...'
+		# 		)
+		# 	else:
+		# 		elements_text = f'{elements_text}\n[End of page]'
+		# else:
+		# 	elements_text = 'empty page'
 
 		if self.step_info:
 			step_info_description = f'Current step: {self.step_info.step_number + 1}/{self.step_info.max_steps}'
@@ -240,12 +262,10 @@ Available tabs:
 {self.state.tabs}
 Interactive elements from current page:
 \n
-{elements_text}
+{self.state.a11y_tree}
 \n
 {step_info_description}
 \n
-tree structure:
-{self.tree_str if self.tree_str else 'No tree structure available.'}
 
 """
 
