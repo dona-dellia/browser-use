@@ -26,6 +26,7 @@ class InputTextAction(BaseModel):
 class DoneAction(BaseModel):
 	text: str
 	is_success: bool
+	is_lacking_auth: bool
 
 
 class SwitchTabAction(BaseModel):

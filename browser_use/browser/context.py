@@ -148,6 +148,7 @@ class BrowserContext:
 		self.browser = browser
 		self.session: Optional[BrowserSession] = None
 		self.current_state: Optional[BrowserState] = None
+		self.access_verification_active = False
 
 	async def __aenter__(self):
 		"""Async context manager entry"""

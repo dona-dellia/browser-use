@@ -269,3 +269,23 @@ final_scroll = driver.execute_script("return arguments[0].scrollTop", elemento)
 assert final_scroll > initial_scroll, "Scroll down failed. No scroll detected"
 """
     return selenium_code
+
+def assert_element_exists(element_xpath) -> str:
+    selenium_code = f"assert driver.find_element(By.XPATH, '{element_xpath}')"
+    return selenium_code
+
+def assert_element_value(element_xpath, expected_value) -> str:
+    selenium_code = f"""
+element = driver.find_element(By.XPATH, '{element_xpath}')
+element_current_value = element.get_attribute("value")
+assert element_current_value == '{expected_value}'
+"""
+    return selenium_code
+
+def assert_element_attribute(element_xpath, attr, expected_value) -> str:
+    selenium_code = f"""
+element = driver.find_element(By.XPATH, '{element_xpath}')
+element_current_value = str(element.get_attribute("{attr}"))
+assert element_current_value == '{expected_value}'
+"""
+    return selenium_code

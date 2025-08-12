@@ -18,52 +18,95 @@ from browser_use.dom.accessibility import parse_accessibility_tree, Accessibilit
 
 logger = logging.getLogger(__name__)
 
-
 class DomService:
 	def __init__(self, driver: WebDriver):
 		self.driver = driver
 		self.xpath_cache = {}
 
-	def _filter_nodes(self, current):
-		exclude = []
+	def _map_node_to_highlight_index(self, node, node_id, highlight_map):
+		has_attrs = "attributes" in node
+
+		if has_attrs:
+			attrs: List[str] = node["attributes"]
+			is_highlighted_element = "browser-user-highlight-id" in attrs
+
+			if is_highlighted_element:
+				highlight_index = int(next(attr for attr in attrs if attr.startswith("browser-user-highlight-") and attr != "browser-user-highlight-id").split("-")[-1])
+				highlight_map[node_id] = highlight_index
+		else:
+			if "parentId" not in node: return
+			parent = self.driver.execute_cdp_cmd("DOM.describeNode", {
+            	"backendNodeId": int(node["parentId"])
+        	})["node"]
+			self._map_node_to_highlight_index(parent, node_id, highlight_map)
+
+	def _filter_nodes(self, a11y_tree):
 		highlight_map = {}
 
-		for node in current:
-			if "attributes" in node:
-				attrs: List[str] = node["attributes"]
-				has_highlight_attribute = "browser-user-highlight-label" in attrs
-				is_highlighted_element = "browser-user-highlight-id" in attrs
+		def check_and_add_highlight(node_id: int, attrs: list):
+			if "browser-user-highlight-id" in attrs:
+				highlight_index = int(next(
+        	        attr for attr in attrs 
+        	         if attr.startswith("browser-user-highlight-") and attr != "browser-user-highlight-id").split("-")[-1])
+				highlight_map[node_id] = highlight_index
 
-				if has_highlight_attribute: 
-					exclude.append(node)
-				elif is_highlighted_element:
-					highlight_index = int(next(attr for attr in attrs if attr.startswith("browser-user-highlight-") and attr != "browser-user-highlight-id").split("-")[-1])
-					highlight_map[node["backendNodeId"]] = highlight_index
+		for node in a11y_tree:
+			if "backendDOMNodeId" not in node:
+				continue
 
-			if "children" in node:
-				children_exclude, children_highlight_map = self._filter_nodes(node["children"])
-				exclude += children_exclude
-				highlight_map = highlight_map | children_highlight_map
+			node_id = node["backendDOMNodeId"]
+			node_data = self.driver.execute_cdp_cmd("DOM.describeNode", {
+	            "backendNodeId": node_id
+	        })["node"]
+			
+			if "attributes" in node_data:
+				check_and_add_highlight(node_id, node_data["attributes"])
+				continue
+			
+			if "parentId" not in node:
+				continue
+			
+			parent_data = self.driver.execute_cdp_cmd("DOM.describeNode", {
+	            "backendNodeId": int(node["parentId"])
+	        })["node"]
+			
+			if "attributes" in parent_data:
+				check_and_add_highlight(node_id, parent_data["attributes"])
+				
+		return highlight_map
 
-		return exclude, highlight_map
 
-	async def _get_accessibility_tree_info(self) -> tuple[str, dict[str, Any]]:
+	def _get_accessibility_tree_info(self) -> tuple[str, dict[str, Any]]:
 		"""
 		Extrai a árvore de acessibilidade usando o Chrome DevTools Protocol via driver.execute_cdp_cmd.
 		"""
 		driver = self.driver
 		try:
 			tree_data = driver.execute_cdp_cmd("Accessibility.getFullAXTree", {})
-			exclude_nodes, highlight_map = self._filter_nodes(driver.execute_cdp_cmd("DOM.getDocument", {
-				"depth": -1
-			})["root"]["children"])
-			browser_use_node_ids = {node["backendNodeId"] for node in exclude_nodes}
 			accessibility_tree: AccessibilityTree = tree_data.get("nodes", [])
-			filtered_accessibility_tree = list(filter(lambda node: "backendDOMNodeId" in node and node["backendDOMNodeId"] not in browser_use_node_ids, accessibility_tree))
-			return parse_accessibility_tree(filtered_accessibility_tree, highlight_map)
+			highlight_map = self._filter_nodes(accessibility_tree)
+			tree_str, _ = parse_accessibility_tree(accessibility_tree, highlight_map)
+			return accessibility_tree, tree_str, highlight_map
 		except Exception as e:
 			logger.error(f"[Accessibility] Erro ao capturar árvore de acessibilidade: {e}")
 			return "", {}
+	
+	def _highlight_elements(self, nodes, highlight_map, selector_map):
+		paths = []
+		for node in nodes:
+			if "backendDOMNodeId" not in node: continue
+			node_id = node["backendDOMNodeId"]
+			if node_id not in highlight_map: continue
+			node_highlight_index = highlight_map[node_id]
+			x_path = selector_map[node_highlight_index].xpath
+			paths.append({
+				"path": x_path,
+				"index": node_highlight_index
+			})
+
+		js_code = resources.read_text('browser_use.dom', 'highlightElements.js')
+		args_str = f"{{ paths: {paths} }}"
+		self.driver.execute_script(f"({js_code})({args_str})")
 
 	# region - Clickable elements
 	async def get_clickable_elements(
@@ -74,9 +117,10 @@ class DomService:
 	) -> DOMState:
 		element_tree = await self._build_dom_tree(highlight_elements, focus_element, viewport_expansion)
 		selector_map = self._create_selector_map(element_tree)
-		tree_str, _ = await self._get_accessibility_tree_info()
+		a11y_tree, tree_str, highlight_map = self._get_accessibility_tree_info()
+		self._highlight_elements(a11y_tree, highlight_map, selector_map)
 
-		return DOMState(element_tree=element_tree, selector_map=selector_map, a11y_tree=tree_str)
+		return DOMState(element_tree=None, selector_map=selector_map, a11y_tree=tree_str)
 
 	async def _build_dom_tree(
 		self,
@@ -85,12 +129,6 @@ class DomService:
 		viewport_expansion: int,
 	) -> DOMElementNode:
 		js_code = resources.read_text('browser_use.dom', 'buildDomTree.js')
-
-		args = {
-			'doHighlightElements': highlight_elements,
-			'focusHighlightIndex': focus_element,
-			'viewportExpansion': viewport_expansion,
-		}
 
 		# Convert args to JavaScript format
 		args_str = f"{{ doHighlightElements: {str(highlight_elements).lower()}, focusHighlightIndex: {focus_element}, viewportExpansion: {viewport_expansion} }}"
@@ -131,7 +169,7 @@ class DomService:
 			text_node = DOMTextNode(
 				text=node_data['text'],
 				is_visible=node_data['isVisible'],
-				parent=parent,
+				parent=parent
 			)
 			return text_node
 

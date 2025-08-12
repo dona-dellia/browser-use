@@ -63,6 +63,7 @@ class Controller(Generic[Context]):
 		self.exclude_actions = exclude_actions
 		self.output_model = output_model
 		self.registry = Registry(exclude_actions)
+		self.is_lacking_auth = False
 
 		"""Register all default browser actions"""
 
@@ -116,13 +117,23 @@ class Controller(Generic[Context]):
 		@self.registry.action('Navigate to URL in the current tab', param_model=GoToUrlAction)
 		async def go_to_url(params: GoToUrlAction, browser: BrowserContext):
 			driver = await browser.get_current_driver()
-			driver.get(params.url)
+			expected_url = params.url.rstrip('/')
+			driver.get(expected_url)
 			await asyncio.sleep(browser.config.minimum_wait_page_load_time)
-			msg = f'🔗  Navigated to {params.url}'
+			current_url = driver.current_url.rstrip('/')
+			if browser.access_verification_active and current_url != expected_url:
+				self.is_lacking_auth = True
+				msg = (
+					f"🚫 Access denied: the accessed URL was '{current_url}', "
+					f"but the expected one was '{expected_url}'. Check if you have permission."
+				)
+				raise Exception(msg)
+
+			msg = f":link: Navigation successfully completed to {expected_url}"
 			logger.info(msg)
    
-			selenium_code = selenium_snippets.go_to(params.url)	
-			self._save_selenium_code(selenium_code)   
+			selenium_code = selenium_snippets.go_to(expected_url)
+			self._save_selenium_code(selenium_code) 
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 
 		@self.registry.action('Go back', param_model=NoParamsAction)
@@ -168,6 +179,19 @@ class Controller(Generic[Context]):
 				msg = f'Index {params.index} - has an element which opens file upload dialog. To upload files please use a specific function to upload files '
 				logger.info(msg)
 				return ActionResult(extracted_content=msg, include_in_memory=True)
+			
+			web_element = driver.find_element("xpath", element_node.xpath)
+			if not web_element.is_enabled():
+				# Verifies if it´s a submit button, `value="Submit"` 
+				value_attribute = web_element.get_attribute("value")
+				button_type = web_element.get_attribute("type") 
+
+				# If it´s not, treats it like "you dont have the permision"
+				if value_attribute != "Submit" and button_type != "submit":
+					self.is_lacking_auth = True
+					raise Exception("🚫: Attempt to click on disabled element — you dont have the permission.")
+
+				raise Exception("🚫: Button is disabled because required fields are not filled.")
 
 			msg = None
 

@@ -41,11 +41,12 @@ def parse_accessibility_tree(accessibility_tree: AccessibilityTree, highlight_ma
         indent = "\t" * depth
         tree_str = ""
         valid_node = True
-        node_id = str(highlight_map[node["backendDOMNodeId"]]) if "backendDOMNodeId" in node and node["backendDOMNodeId"] in highlight_map else ""
 
         try:
             role = node["role"]["value"]
             name = node["name"]["value"]
+            id_key = "backendDOMNodeId"
+            node_id = str(highlight_map[node[id_key]]) if id_key in node and node[id_key] in highlight_map else ""
 
             node_str = f"[{node_id}] {role} {repr(name)}"
             properties = []

@@ -14,7 +14,10 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 import browser_use.controller.selenium_snippets as selenium_snippets
+from typing import List, Union
+from langchain_core.chat_history import InMemoryChatMessageHistory
 
+from agno.agent import Agent, RunResponse
 
 from dotenv import load_dotenv
 from google.api_core.exceptions import ResourceExhausted
@@ -56,6 +59,7 @@ from browser_use.telemetry.views import (
 	AgentStepTelemetryEvent,
 )
 from browser_use.utils import time_execution_async
+from agno_bu.agents.agents import createAgnoAgent
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -120,6 +124,11 @@ class Agent:
 		planner_llm: Optional[BaseChatModel] = None,
 		planner_interval: int = 1,  # Run planner every N steps
 	):
+		## agno
+		##
+  
+		self.session_id = "rodrigo"
+		self.store = {}
 		self.agent_id = str(uuid.uuid4())  # unique identifier for the agent
 		self.sensitive_data = sensitive_data
 		if not page_extraction_llm:
@@ -180,6 +189,8 @@ class Agent:
 
 		# Action and output models setup
 		self._setup_action_models()
+		#agno
+		self.agnoAgent = createAgnoAgent(self.AgentOutput)
 		self._set_version_and_source()
 		self.max_input_tokens = max_input_tokens
 
@@ -309,7 +320,7 @@ class Agent:
 				self.message_manager.add_plan(plan, position=-1)
 
 			input_messages = self.message_manager.get_messages()
-
+			#print(f'Input messages: {input_messages}')
 			self._check_if_stopped_or_paused()
 
 			try:
@@ -445,50 +456,104 @@ class Agent:
 			return merged_input_messages
 		return input_messages
 
+	def _normalize_input_messages(self, messages: List[Union[BaseMessage, str, tuple]]) -> List[BaseMessage]:
+		norm: List[BaseMessage] = []
+		for m in messages:
+			if isinstance(m, BaseMessage):
+				norm.append(m)
+			elif isinstance(m, str):
+				norm.append(HumanMessage(content=m))  # string vira HumanMessage
+			elif isinstance(m, tuple) and len(m) == 2:
+				role, content = m
+				role = (role or "").lower()
+				if role in ("system", "sys"):
+					norm.append(SystemMessage(content=content))
+				elif role in ("ai", "assistant", "bot"):
+					norm.append(AIMessage(content=content))
+				else:
+					norm.append(HumanMessage(content=content))
+			else:
+				raise TypeError(f"Tipo de mensagem não suportado: {type(m)} -> {m}")
+		return norm
+
+	def get_session(self, session_id: str) -> InMemoryChatMessageHistory:
+		if session_id not in self.store:
+			self.store[session_id] = InMemoryChatMessageHistory()
+		return self.store[session_id]
+
+	async def partial_enrichment(self, session_id: str, input_messages: List[Union[BaseMessage, str, tuple]], max_history_ai: int = 12) -> AIMessage:
+		"""
+		`input_messages` JÁ inclui a pergunta (e opcionalmente SystemMessage).
+		Só adicionamos o histórico (apenas AIMessage que você vem salvando) antes.
+		"""
+		history = self.get_session(session_id)
+
+		# (opcional) limitar quanto histórico vai junto — bom pra tempo/memória
+		hist_msgs = history.messages[-max_history_ai:] if max_history_ai > 0 else list(history.messages)
+
+		normalized_inputs = self._normalize_input_messages(input_messages)
+		full_messages: List[BaseMessage] = [*hist_msgs, *normalized_inputs]
+		
+		resp: AIMessage = await self.llm.ainvoke(full_messages)  # type: ignore
+
+		# manter sua política: salvar SOMENTE respostas
+		history.add_ai_message(resp.content)
+
+		return resp
+
 	@time_execution_async('--get_next_action')
 	async def get_next_action(self, input_messages: list[BaseMessage]) -> AgentOutput:
 		"""Get next action from LLM based on current state"""
 		input_messages = self._convert_input_messages(input_messages, self.model_name)
-		#print(f'Input messages: {input_messages}')
-		if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1'):
-			output = self.llm.invoke(input_messages)
-			output.content = self._remove_think_tags(output.content)
-			# TODO: currently invoke does not return reasoning_content, we should override invoke
-			try:
-				parsed_json = self.message_manager.extract_json_from_model_output(output.content)
-				parsed = self.AgentOutput(**parsed_json)
-			except (ValueError, ValidationError) as e:
-				logger.warning(f'Failed to parse model output: {output} {str(e)}')
-				raise ValueError('Could not parse response.')
-		elif self.tool_calling_method is None:
-			structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
-			response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
-			parsed: AgentOutput | None = response['parsed']
-		else:
-			
-			response_text = await self.llm.ainvoke(input_messages)
-			print(f'Raw response: {response_text}')	
-			response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
-			response_text = self._remove_think_tags(response_text)
-			response_text = json.loads(response_text)
-			
-			if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
-				response_text = response_text["parameters"]
-			#extract_page = {"extract_content": {"goal": f"Extract all visible text and structure related to the goal:{response_text["current_state"]["next_goal"]}"}}
-			#response_text["action"].append(extract_page)
-			response_text = json.dumps(response_text)
-
-			parsed_json = self.message_manager.extract_json_from_model_output(response_text)
-			
-			parsed = self.AgentOutput(**parsed_json)
-
-		if parsed is None:
-			raise ValueError('Could not parse response.')
-
-		# cut the number of actions to max_actions_per_step
+		# print(f'Input messages: {input_messages}')
+		
+		response: RunResponse = self.agnoAgent.run(input_messages)
+		response = response.to_dict()['content']
+		print(f'response: {response}')
+		parsed = self.AgentOutput(**response)
 		parsed.action = parsed.action[: self.max_actions_per_step]
 		self._log_response(parsed)
 		self.n_steps += 1
+  
+		# #print(f'Input messages: {input_messages}')
+		# if self.model_name == 'deepseek-reasoner' or self.model_name.startswith('deepseek-r1'):
+		# 	output = self.llm.invoke(input_messages)
+		# 	output.content = self._remove_think_tags(output.content)
+		# 	# TODO: currently invoke does not return reasoning_content, we should override invoke
+		# 	try:
+		# 		parsed_json = self.message_manager.extract_json_from_model_output(output.content)
+		# 		parsed = self.AgentOutput(**parsed_json)
+		# 	except (ValueError, ValidationError) as e:
+		# 		logger.warning(f'Failed to parse model output: {output} {str(e)}')
+		# 		raise ValueError('Could not parse response.')
+		# elif self.tool_calling_method is None:
+		# 	structured_llm = self.llm.with_structured_output(self.AgentOutput, include_raw=True)
+		# 	response: dict[str, Any] = await structured_llm.ainvoke(input_messages)  # type: ignore
+		# 	parsed: AgentOutput | None = response['parsed']
+		# else:
+
+		# 	response_text = await self.partial_enrichment(session_id=self.session_id, input_messages=input_messages)
+
+		# 	response_text = response_text.content if hasattr(response_text, 'content') else str(response_text)
+		# 	response_text = self._remove_think_tags(response_text)
+		# 	response_text = json.loads(response_text)
+		# 	if "name" in response_text and response_text["name"] == "AgentOutput" and "parameters" in response_text:
+		# 		response_text = response_text["parameters"]
+		# 	#extract_page = {"extract_content": {"goal": f"Extract all visible text and structure related to the goal:{response_text["current_state"]["next_goal"]}"}}
+		# 	#response_text["action"].append(extract_page)
+		# 	response_text = json.dumps(response_text)
+
+		# 	parsed_json = self.message_manager.extract_json_from_model_output(response_text)
+
+		# 	parsed = self.AgentOutput(**parsed_json)
+
+		# if parsed is None:
+		# 	raise ValueError('Could not parse response.')
+
+		# # cut the number of actions to max_actions_per_step
+		# parsed.action = parsed.action[: self.max_actions_per_step]
+		# self._log_response(parsed)
+		# self.n_steps += 1
 
 		return parsed
 
@@ -579,8 +644,13 @@ class Agent:
 					check_break_if_paused=lambda: self._check_if_stopped_or_paused(),
 				)
 				self._last_result = result
+				self.browser_context.access_verification_active = True
 
 			for step in range(max_steps):
+				if self.controller.is_lacking_auth:
+					logger.error("Execution stopped due to lack of permission.")
+					return self.history
+				
 				if self._too_many_failures():
 					break
 
